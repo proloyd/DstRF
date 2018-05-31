@@ -17,7 +17,7 @@ import time
 
 
 class DstRFcv(DstRF):
-    def __init__(self, lead_field, noise_covariance, n_trials, mu, filter_length=200, n_iter=50, n_iterc=40, n_iterf=15, ES=True):
+    def __init__(self, lead_field, noise_covariance, n_trials, mu, filter_length=200, n_iter=10, n_iterc=30, n_iterf=15, ES=True):
         # DstRF.__init__(self, lead_field, noise_covariance, n_trials, filter_length=filter_length,
         #                n_iter=n_iter, n_iterf=n_iterf)
         DstRF.__init__(self, lead_field, noise_covariance, n_trials, filter_length=filter_length,
