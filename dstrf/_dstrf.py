@@ -428,8 +428,12 @@ class DstRF:
         # initializing \Theta
         self.theta = np.zeros((self.sources_n * dc, self.basis.shape[1]))
 
+        return self
+
     def set_mu(self, mu):
         self.mu = mu
+
+        return self
 
     def __solve(self, theta, trial):
         """
