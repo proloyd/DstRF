@@ -482,6 +482,8 @@ class DstRF:
         self.Gamma[trial] = gamma
         self.Sigma_b[trial] = sigma_b_next
 
+        return self
+
     # def __solve_1_step(self, theta, trial, verbose=0):
     #     """
     #
@@ -624,6 +626,8 @@ class DstRF:
             theta = np.squeeze(theta.reshape(1, -1))
             for i, _ in enumerate(self.theta):
                 self.theta[i] = theta[i]
+
+        return self
 
     def get_strf(self, fs):
         """
