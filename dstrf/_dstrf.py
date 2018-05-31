@@ -355,7 +355,7 @@ class DstRF:
 
 
     """
-    def __init__(self, lead_field, noise_covariance, n_trials, mu, filter_length=200, n_iter=30, n_iterc=1000, n_iterf=1000):
+    def __init__(self, lead_field, noise_covariance, n_trials, filter_length=200, n_iter=30, n_iterc=1000, n_iterf=1000):
         if lead_field.has_dim('space'):
             self.lead_field = lead_field.get_data (dims=('sensor', 'source', 'space')).astype('float64')
             self.sources_n = self.lead_field.shape[1]
