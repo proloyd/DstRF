@@ -355,7 +355,7 @@ class DstRF:
 
 
     """
-    def __init__(self, lead_field, noise_covariance, n_trials, filter_length=200, n_iter=30, n_iterc=1000, n_iterf=1000):
+    def __init__(self, lead_field, noise_covariance, n_trials, mu, filter_length=200, n_iter=30, n_iterc=1000, n_iterf=1000):
         if lead_field.has_dim('space'):
             self.lead_field = lead_field.get_data (dims=('sensor', 'source', 'space')).astype('float64')
             self.sources_n = self.lead_field.shape[1]
@@ -427,6 +427,9 @@ class DstRF:
 
         # initializing \Theta
         self.theta = np.zeros((self.sources_n * dc, self.basis.shape[1]))
+
+    def set_mu(self, mu):
+        self.mu = mu
 
     def __solve(self, theta, trial):
         """
@@ -536,13 +539,12 @@ class DstRF:
     #
     #     self._ytilde[trial] = self._meg[trial] - np.dot(np.dot(self.lead_field, inverse_kernel), y)
 
-    def fit(self, mu, mp=False, tol=1e-2, verbose=0):
+    def fit(self, mp=False, tol=1e-4, verbose=0):
         """
 
         :return:
 
         """
-
         # check if the probelm is set up properly
         if len(self._meg) is not self.n_trials:
             print "Warning: " \
@@ -553,12 +555,12 @@ class DstRF:
 
         if self.orientation == 'fixed':
             dc = 1
-            g_funct = lambda (x): g(x, mu)
-            prox_g = lambda x, t: shrink(x, mu * t)
+            g_funct = lambda (x): g(x, self.mu)
+            prox_g = lambda x, t: shrink(x, self.mu * t)
         elif self.orientation == 'free':
             dc = 3
-            g_funct = lambda (x): g_group(x, mu)
-            prox_g = lambda x, t: proxg_group(x, mu * t)
+            g_funct = lambda (x): g_group(x, self.mu)
+            prox_g = lambda x, t: proxg_group(x, self.mu * t)
 
         # inverse_noise_covariance = linalg.inv(self.noise_covariance)
 
