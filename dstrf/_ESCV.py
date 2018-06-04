@@ -62,3 +62,14 @@ class DstRFcv(DstRF):
 
         self.theta = np.array(self.theta).reshape((self.sources_n * dc, self.basis.shape[1]))
 
+    def setup_from_self(self, obj):
+        import copy
+        self._meg = obj._meg
+        self._covariates = obj._covariates
+        self.Gamma = copy.deepcopy(obj.Gamma)
+        self.Sigma_b = copy.deepcopy(obj.Sigma_b)
+        self.theta = copy.deepcopy(obj.theta)
+        self._testmeg = obj._testmeg
+        self._teststim = obj._teststim
+        self._es_stim = obj._es_stim
+
