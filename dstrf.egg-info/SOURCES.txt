@@ -1,0 +1,10 @@
+README.md
+dstrf/_ESCV.py
+dstrf/__init__.py
+dstrf/_basis.py
+dstrf/_dstrf.py
+dstrf/_fastac.py
+dstrf.egg-info/PKG-INFO
+dstrf.egg-info/SOURCES.txt
+dstrf.egg-info/dependency_links.txt
+dstrf.egg-info/top_level.txt
