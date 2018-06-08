@@ -73,3 +73,16 @@ class DstRFcv(DstRF):
         self._teststim = obj._teststim
         self._es_stim = obj._es_stim
 
+    def get_lead_field(self):
+        if self.orientation == 'free':
+            dims = (self.sensor, self.source, self.space)
+            lead_field = NDVar(self.lead_field.reshape(self.lead_field.shape[0], -1, 3), dims=dims)
+        elif self.orientation == 'fixed':
+            dims = (self.sensor, self.source)
+            lead_field = NDVar(self.lead_field, dims=dims)
+        else:
+            print('Oops! Couldn\'t determine lead-field orientation')
+
+        return lead_field
+
+
