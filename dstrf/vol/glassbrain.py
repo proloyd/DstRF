@@ -13,7 +13,10 @@ class GlassBrain(TimeSlicer):
     def __init__(self, ndvar, src, dest='mri', mri_resolution=False, black_bg=False, display_mode='lyrz',
                  threshold='None', colorbar=False, alpha=0.7, vmin=None, vmax=None, plot_abs=True):
         from nilearn.plotting import plot_glass_brain
-        from matplotlib.pyplot import figure
+        from matplotlib.pyplot import figure, ion
+
+        print('Turning interactive backend on.')
+        ion()
 
         self._glass_brain = plot_glass_brain
         self.figure = figure()
@@ -116,6 +119,7 @@ def butterfly(ndvar, src, dest='mri', mri_resolution=False, black_bg=False, disp
 #     fname = ROOTDIR + 'Group analysis/Dataset wf-onset-u.pickled'
 #     ds = pickle.load(open(fname, 'rb'))
 #     h = ds['trf'].mean('case')
+#     gb = butterfly(h, src, dest='surf', threshold=10)
 #     p = plot.Butterfly(h.norm('space'))
 #     gb = GlassBrain(h, src, dest='surf', threshold=5e-13)
 #     p.link_time_axis(gb)
