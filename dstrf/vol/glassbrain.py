@@ -6,9 +6,8 @@ from eelbrain.plot._base import TimeSlicer
 import mne
 
 import numpy as np
-from matplotlib import cm as mpl_cm
-from matplotlib import colors
-from matplotlib.colorbar import ColorbarBase
+from nilearn.plotting import plot_glass_brain
+import matplotlib
 
 from _nifti_utils import _save_stc_as_volume
 
@@ -17,14 +16,11 @@ class GlassBrain(TimeSlicer):
 
     def __init__(self, ndvar, src, dest='mri', mri_resolution=False, black_bg=False, display_mode='lyrz',
                  threshold='auto', colorbar=False, cmap=None,alpha=0.7, vmin=None, vmax=None, plot_abs=True):
-        from nilearn.plotting import plot_glass_brain
-        from matplotlib.pyplot import figure, ion
 
-        print('Turning interactive backend on.')
-        ion()
+        if not matplotlib.is_interactive():
+            print('Turning interactive backend on.')
+            matplotlib.interactive(True)
 
-        self._glass_brain = plot_glass_brain
-        self.figure = figure()
 
         # src
         # check if file name
@@ -41,6 +37,18 @@ class GlassBrain(TimeSlicer):
 
         if ndvar.has_dim ('space'):
             ndvar = ndvar.norm ('space')
+            # set vmax and vmin
+            if vmax is None:
+                vmax = ndvar.max ()
+            if vmin is None:
+                vmin = ndvar.min ()
+        else:
+            # set vmax and vmin
+            if vmax is None:
+                vmax = np.maximum (ndvar.max (), -ndvar.min ())
+            if vmin is None:
+                vmin = np.minimum (-ndvar.max (), ndvar.min ())
+
         self._ndvar = ndvar
 
         if ndvar.has_dim('time'):
@@ -64,11 +72,10 @@ class GlassBrain(TimeSlicer):
                             alpha=alpha,
                             vmin=vmin,
                             vmax=vmax,
-                            plot_abs=plot_abs
+                            plot_abs=plot_abs,
                             )
         self.glassbrain = plot_glass_brain(_save_stc_as_volume(None, ndvar0, self.src, **self.kwargs0),
                                            title=title,
-                                           figure=self.figure,
                                            **self.kwargs1
                                            )
         TimeSlicer.__init__(self, (ndvar,))
@@ -76,15 +83,26 @@ class GlassBrain(TimeSlicer):
     def _update_time(self, t, fixate):
         ndvart = self._ndvar.sub(time=t)
         title = 'time = %s ms' % round (t * 1e3)
+
         # remove existing image
         for display_ax in self.glassbrain.axes.values():
             if len(display_ax.ax.images) > 1:
                 display_ax.ax.images[-1].remove()
-        self.glassbrain._colorbar = False
+
+        # No need to take care of the colorbar anymore
+        # Still thete is some bug!
+        if self.kwargs1['colorbar']:
+            self.glassbrain._colorbar_ax.redraw_in_frame()
+            self.glassbrain._colorbar = False
+
         self.glassbrain.add_overlay(_save_stc_as_volume(None, ndvart, self.src, **self.kwargs0),
                                     threshold=self.kwargs1['threshold'],
                                     colorbar=self.kwargs1['colorbar'],
-                                    **dict(cmap=self.kwargs1['cmap']))
+                                    **dict(cmap=self.kwargs1['cmap'],
+                                           # norm=self.kwargs1['norm'],
+                                           vmax=self.kwargs1['vmax'],
+                                           vmin=self.kwargs1['vmin'],
+                                           alpha=self.kwargs1['alpha'],))
         self.glassbrain.title(title)
         # update colorbar
         # if self.kwargs1['colorbar']:
