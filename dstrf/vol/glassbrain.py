@@ -220,20 +220,20 @@ def butterfly(ndvar, src, dest='mri', mri_resolution=False, black_bg=False, disp
     return p, gb
 
 
-# if __name__ == '__main__':
-#     import cPickle as pickle
-#
-#     ROOTDIR = 'G:/My Drive/Proloy/'
-#
-#     fname = ROOTDIR + '/mri/fsaverage/bem/fsaverage-vol-10-src.fif'
-#     src = mne.read_source_spaces(fname)
-#
-#     fname = ROOTDIR + 'Group analysis/Dataset wf-onset-u.pickled'
-#     ds = pickle.load(open(fname, 'rb'))
-#     h = ds['trf'].mean('case')
-#     gb = butterfly(h, src, dest='surf', threshold=10)
-#     p = plot.Butterfly(h.norm('space'))
-#     gb = GlassBrain(h, src, dest='surf', threshold=5e-13)
-#     p.link_time_axis(gb)
+if __name__ == '__main__':
+    import cPickle as pickle
+
+    ROOTDIR = 'G:/My Drive/Proloy/'
+
+    fname = ROOTDIR + '/mri/fsaverage/bem/fsaverage-vol-10-src.fif'
+    src = mne.read_source_spaces(fname)
+
+    fname = ROOTDIR + 'Group analysis/Dataset wf-onset-u.pickled'
+    ds = pickle.load(open(fname, 'rb'))
+    h = ds['trf'].mean('case')
+    gb = butterfly(h, src, dest='surf', threshold=10)
+    p = plot.Butterfly(h.norm('space'))
+    gb = GlassBrain(h, src, dest='surf', threshold=5e-13)
+    p.link_time_axis(gb)
 
 
