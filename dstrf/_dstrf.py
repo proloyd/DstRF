@@ -14,6 +14,9 @@ from ._fastac import Fasta
 import time
 
 
+orientation = {'fixed': 1, 'free': 3}
+
+
 def f(A, L, x, b, E):
     """
     Main Objective function corresponding to each trial
@@ -372,12 +375,32 @@ class DstRF:
         self.basis = gaussian_basis(self.filter_length, x)
         self._covariates = []
         self._meg = []
-        self.Gamma = []
-        self.Sigma_b = []
         # self._ytilde = []
         self.n_iter = n_iter
         self.n_iterc = n_iterc
         self.n_iterf = n_iterf
+        self.__init__vars()
+
+    def __init__vars(self):
+        wf = linalg.cholesky(self.noise_covariance, lower=True)
+        Gtilde = linalg.solve(wf, self.lead_field)
+        self.eta = (self.lead_field.shape[0] / np.trace(np.dot(Gtilde, Gtilde.T)))
+        # model data covariance
+        sigma_b = self.noise_covariance + self.eta * np.dot(self.lead_field, self.lead_field.T)
+        self.init_sigma_b = sigma_b
+        return self
+
+    def __init__iter(self):
+        self.Gamma = []
+        self.Sigma_b = []
+        dc = orientation[self.orientation]
+        for _ in range(self.n_trials):
+            self.Gamma.append([self.eta * np.eye (dc, dtype='float64') for _ in range(self.sources_n)])
+            self.Sigma_b.append(self.init_sigma_b.copy())
+
+        # initializing \Theta
+        self.theta = np.zeros((self.sources_n * dc, self.basis.shape[1]))
+        return self
 
     def setup(self, meg, stim, normalize_regresor=True, verbose=0):
         """
@@ -390,45 +413,16 @@ class DstRF:
         y = meg.get_data(('sensor', 'time'))
         y = y[:, self.basis.shape[1]:]
         self._meg.append(y/sqrt(y.shape[1]))    # Mind the normalization
-        # self._ytilde.append(y/sqrt(y.shape[1]))
 
         # set up covariate matrix
-        self._covariates.append(np.dot (covariate_from_stim(stim, self.filter_length, normalize=normalize_regresor),
-                                self.basis)/sqrt(y.shape[1]))
-
-
-        # y = meg
-        Cb = np.dot(y, y.T)    # empirical data covariance
-        yhat = linalg.cholesky(Cb, lower=True)
-
-        # noise_covariance = np.eye(self.noise_covariance.shape[0])  # since the data is pre whitened
-        noise_covariance = self.noise_covariance
-
-        # Choose dc
-        if self.orientation == 'fixed': dc = 1
-        elif self.orientation == 'free': dc = 3
-
-        # initializing gamma
-        wf = linalg.cholesky(self.noise_covariance, lower=True)
-        Gtilde = linalg.solve(wf, self.lead_field)
-        eta = (self.lead_field.shape[0] / np.trace(np.dot(Gtilde, Gtilde.T)))
-        self.Gamma.append([eta * np.eye(dc, dtype='float64') for _ in range(self.sources_n)])  # Initial gamma
-        # print "Gamma = {:10f}".format(eta)
-
-        # model data covariance
-        sigma_b = noise_covariance
-        for j in range(self.sources_n):
-            sigma_b = sigma_b + np.dot(self.lead_field[:, j * dc:(j + 1) * dc],
-                                        np.dot (self.Gamma[-1][j], self.lead_field[:, j * dc:(j + 1) * dc].T))
-        self.Sigma_b.append(sigma_b)
-
-        # initializing \Theta
-        self.theta = np.zeros((self.sources_n * dc, self.basis.shape[1]))
+        self._covariates.append(np.dot(covariate_from_stim(stim, self.filter_length, normalize=normalize_regresor),
+                                       self.basis)/sqrt(y.shape[1]))
 
         return self
 
     def set_mu(self, mu):
         self.mu = mu
+        self.__init__iter()
         return self
 
     def __solve(self, theta, trial):

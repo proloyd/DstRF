@@ -27,10 +27,6 @@ class DstRFcv(DstRF):
         self._es_stim.append(np.dot(covariate_from_stim(stim, self.filter_length, normalize=False),
                              self.basis))
 
-    def set_mu(self, mu):
-        self.mu = mu
-        return self
-
     def eval_model_fit(self):
         v = 0
         for trial in range(self.n_trials):
