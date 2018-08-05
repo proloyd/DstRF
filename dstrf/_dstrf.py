@@ -535,7 +535,7 @@ class DstRF:
     #
     #     self._ytilde[trial] = self._meg[trial] - np.dot(np.dot(self.lead_field, inverse_kernel), y)
 
-    def fit(self, tol=1e-2, verbose=0):
+    def fit(self, tol=1e-3, verbose=0):
         """
 
         :return:
