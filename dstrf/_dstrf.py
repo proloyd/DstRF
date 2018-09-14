@@ -353,7 +353,6 @@ class DstRF:
         inverse imaging kernel
         returned only if return_inverse_kernel=1
 
-
     """
     def __init__(self, lead_field, noise_covariance, n_trials, filter_length=200, n_iter=30, n_iterc=1000, n_iterf=1000):
         if lead_field.has_dim('space'):
