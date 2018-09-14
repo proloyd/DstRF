@@ -276,9 +276,10 @@ class Fasta:
                 self.backtracks.append(n_backtracks)
                 self.objective.append(objective_next + self.g(coefs_next))
                 print("Iteration : {:}, objective value : {:f}, stepsize : {:f},"
-                      " backtracking steps taken: {:}, residual : {:f} \n"
-                      .format(i+1, self.objective[i], self.stepsizes[i]
-                              , self.backtracks[i], self.residuals[i]))
+                      " backtracking steps taken: {:}, residual : {:f} \n".format(
+                       i+1, self.objective[i], self.stepsizes[i], self.backtracks[i], self.residuals[i]
+                                                                                  )
+                )
 
             # Prepare for next iteration
             coefs_current = coefs_next
@@ -295,6 +296,6 @@ class Fasta:
         self.coefs_ = coefs_current
         self.objective_value = objective_next + self.g(coefs_current)
         if verbose:
-            print "total time elapsed : {:f}s".format(end - start)
+            print("total time elapsed : {:f}s".format(end - start))
 
         return self
