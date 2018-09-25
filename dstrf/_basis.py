@@ -3,7 +3,7 @@
 import numpy as np
 
 
-def gaussian_basis( nlevel, span ):
+def gaussian_basis(nlevel, span):
     x = span
     means = np.linspace(x[-1] / nlevel, x[-1] * (1 - 1 / nlevel), num=nlevel - 1)
     stds = 8.5

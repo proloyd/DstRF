@@ -13,7 +13,7 @@ from ._basis import gaussian_basis
 from ._fastac import Fasta
 import time
 
-orientation = {'fixed':1, 'free':3}
+orientation = {'fixed': 1, 'free': 3}
 
 
 def f(A, L, x, b, E):
@@ -280,27 +280,6 @@ def _compute_gamma_i(z, x):
     d = np.sqrt(d)
     temp = np.dot(v * _myinv(np.real(e)), u)
     return np.array(np.real(np.dot(temp * d, np.matrix(temp).H)))
-
-
-def _compute_objective(Cb, isigma_b):
-    """
-
-    Compute objective value at a given iteration
-
-    parameters
-    ----------
-    Cb: ndarray
-    array of shape (K, K)
-
-    isigma_b: ndarray
-    array of shape (K, K)
-
-    returns
-    -------
-    float
-
-    """
-    return np.sum(isigma_b * Cb) - 2 * np.sum(np.log(np.diag(linalg.cholesky(isigma_b))))
 
 
 class DstRF:
@@ -604,7 +583,7 @@ class DstRF:
     #
     #     self._ytilde[trial] = self._meg[trial] - np.dot(np.dot(self.lead_field, inverse_kernel), y)
 
-    def fit(self, tol=1e-3, verbose=0):
+    def fit(self, tol=1e-4, verbose=0):
         """
 
         :return:
@@ -619,12 +598,12 @@ class DstRF:
 
         if self.orientation == 'fixed':
             dc = 1
-            g_funct = lambda x:g(x, self.mu)
-            prox_g = lambda x, t:shrink(x, self.mu * t)
+            g_funct = lambda x: g(x, self.mu)
+            prox_g = lambda x, t: shrink(x, self.mu * t)
         elif self.orientation == 'free':
             dc = 3
-            g_funct = lambda x:g_group(x, self.mu)
-            prox_g = lambda x, t:proxg_group(x, self.mu * t)
+            g_funct = lambda x: g_group(x, self.mu)
+            prox_g = lambda x, t: proxg_group(x, self.mu * t)
 
         # inverse_noise_covariance = linalg.inv(self.noise_covariance)
 
@@ -701,7 +680,7 @@ class DstRF:
             return 0.5 * (y ** 2).sum()
 
         def gradf(L, x, b, E):
-            y = b - np.dot(np.dot(L, x), E.T).astype('float64')
+            y = b - np.dot(np.dot(L, x), E.T)
 
             return -np.dot(L.T, np.dot(y, E))
 
@@ -720,7 +699,6 @@ class DstRF:
             return grad
 
         return funct, grad_funct
-
 
     def get_strf(self, fs):
         """
