@@ -49,11 +49,16 @@ class DstRFcv(DstRF):
         v = 0
         for trial in range(self.n_trials):
             y = self._testmeg[trial] - np.dot(np.dot(self.lead_field, self.theta), self._teststim[trial].T)
+
+            L = linalg.cholesky(self.Sigma_b[trial], lower=True)
+            y = linalg.solve(L, y)
+            v = v + 0.5 * (y ** 2).sum() + np.log(np.diag(L)).sum()
+
             Cb = np.dot(y, y.T)
             v = v + 0.5 * np.trace(linalg.solve(self.Sigma_b[trial], Cb)) \
                 + np.sum(np.log(np.diag(linalg.cholesky(self.Sigma_b[trial]))))
 
-        return v
+        return v / self.n_trials
 
     def setup_from_self( self, obj ):
         import copy

@@ -13,10 +13,10 @@ from ._basis import gaussian_basis
 from ._fastac import Fasta
 import time
 
-orientation = {'fixed': 1, 'free': 3}
+orientation = {'fixed':1, 'free':3}
 
 
-def f( A, L, x, b, E ):
+def f(A, L, x, b, E):
     """
     Main Objective function corresponding to each trial
 
@@ -46,7 +46,7 @@ def f( A, L, x, b, E ):
     return 0.5 * np.sum(A * Cb)
 
 
-def gradf( A, L, x, b, E ):
+def gradf(A, L, x, b, E):
     """
     Gradient of Main Objective function corresponding to each trial
 
@@ -74,7 +74,7 @@ def gradf( A, L, x, b, E ):
     return -np.dot(L.T, np.dot(np.dot(A, y), E))
 
 
-def g( x, mu ):
+def g(x, mu):
     """
     vector l1-norm penalty
 
@@ -93,7 +93,7 @@ def g( x, mu ):
     return mu * np.sum(np.abs(x))
 
 
-def proxg( x, mu, tau ):
+def proxg(x, mu, tau):
     """
     proximal operator for g(x):
 
@@ -114,7 +114,7 @@ def proxg( x, mu, tau ):
     return shrink(x, mu * tau)
 
 
-def shrink( x, mu ):
+def shrink(x, mu):
     """
     Soft theresholding function--
     proximal function for l1-norm:
@@ -133,7 +133,7 @@ def shrink( x, mu ):
     return np.multiply(np.sign(x), np.maximum(np.abs(x) - mu, 0))
 
 
-def g_group( x, mu ):
+def g_group(x, mu):
     """
     group (l12) norm  penalty:
 
@@ -156,7 +156,7 @@ def g_group( x, mu ):
     return val
 
 
-def proxg_group( z, mu ):
+def proxg_group(z, mu):
     """
     proximal operator for gg(x):
 
@@ -180,7 +180,7 @@ def proxg_group( z, mu ):
     return x
 
 
-def covariate_from_stim( stim, M, normalize=False ):
+def covariate_from_stim(stim, M, normalize=False):
     """
     From covariate matrix from stimulus
 
@@ -225,7 +225,7 @@ def covariate_from_stim( stim, M, normalize=False ):
     return np.array(Y)
 
 
-def _myinv( x ):
+def _myinv(x):
     """
 
     Computes inverse
@@ -246,7 +246,7 @@ def _myinv( x ):
     return y
 
 
-def _compute_gamma_i( z, x ):
+def _compute_gamma_i(z, x):
     """
 
     Computes Gamma_i = Z**(-1/2) * ( Z**(1/2) X X' Z**(1/2)) ** (1/2) * Z**(-1/2)
@@ -282,7 +282,7 @@ def _compute_gamma_i( z, x ):
     return np.array(np.real(np.dot(temp * d, np.matrix(temp).H)))
 
 
-def _compute_objective( Cb, isigma_b ):
+def _compute_objective(Cb, isigma_b):
     """
 
     Compute objective value at a given iteration
@@ -363,8 +363,8 @@ class DstRF:
     """
     _n_predictor_variables = 1
 
-    def __init__( self, lead_field, noise_covariance, n_trials, filter_length=200, n_iter=30, n_iterc=1000,
-            n_iterf=1000 ):
+    def __init__(self, lead_field, noise_covariance, n_trials, filter_length=200, n_iter=30, n_iterc=1000,
+            n_iterf=1000):
         if lead_field.has_dim('space'):
             self.lead_field = lead_field.get_data(dims=('sensor', 'source', 'space')).astype('float64')
             self.sources_n = self.lead_field.shape[1]
@@ -390,7 +390,7 @@ class DstRF:
         self.n_iterf = n_iterf
         self.__init__vars()
 
-    def __init__vars( self ):
+    def __init__vars(self):
         wf = linalg.cholesky(self.noise_covariance, lower=True)
         Gtilde = linalg.solve(wf, self.lead_field)
         self.eta = (self.lead_field.shape[0] / np.trace(np.dot(Gtilde, Gtilde.T)))
@@ -399,7 +399,7 @@ class DstRF:
         self.init_sigma_b = sigma_b
         return self
 
-    def __init__iter( self ):
+    def __init__iter(self):
         self.Gamma = []
         self.Sigma_b = []
         dc = orientation[self.orientation]
@@ -411,7 +411,7 @@ class DstRF:
         self.theta = np.zeros((self.sources_n * dc, self._n_predictor_variables * self.basis.shape[1]))
         return self
 
-    def setup( self, meg, stim, normalize_regresor=True, verbose=0 ):
+    def setup(self, meg, stim, normalize_regresor=True, verbose=0):
         """
 
         :param meg:
@@ -434,12 +434,12 @@ class DstRF:
 
         return self
 
-    def set_mu( self, mu ):
+    def set_mu(self, mu):
         self.mu = mu
         self.__init__iter()
         return self
 
-    def __solve( self, theta, trial ):
+    def __solve_old(self, theta, trial):
         """
 
         :param theta:
@@ -489,6 +489,61 @@ class DstRF:
 
         self.Gamma[trial] = gamma
         self.Sigma_b[trial] = sigma_b_next
+
+        return self
+
+    def __solve(self, theta, trial):
+        """
+
+        :param theta:
+        :param trial:
+        :param verbose:
+        :return:
+        """
+        y = self._meg[trial] - np.dot(np.dot(self.lead_field, theta), self._covariates[trial].T)
+        Cb = np.dot(y, y.T)  # empirical data covariance
+        yhat = linalg.cholesky(Cb, lower=True)
+        gamma = self.Gamma[trial]
+        sigma_b = self.Sigma_b[trial].copy()
+        # isigma_b = linalg.inv(self.Sigma_b[trial])
+
+        # Choose dc
+        if self.orientation == 'fixed':
+            dc = 1
+        elif self.orientation == 'free':
+            dc = 3
+
+        # champagne iterations
+        for it in range(self.n_iterc):
+            # pre-compute some useful matrices
+            Lc = linalg.cholesky(sigma_b, lower=True)
+            lhat = linalg.solve(Lc, self.lead_field)
+            ytilde = linalg.solve(Lc, yhat)
+
+            # compute sigma_b for the next iteration
+            sigma_b = self.noise_covariance.copy()
+
+            for i in range(self.sources_n):
+                # update Xi
+                # x = np.dot(gamma[i], np.dot(yhat.T, lhat[:, i * dc:(i + 1) * dc]).T)
+                x = np.dot(gamma[i], np.dot(ytilde.T, lhat[:, i * dc:(i + 1) * dc]).T)
+
+                # update Zi
+                # z = np.dot(self.lead_field[:, i * dc:(i + 1) * dc].T, lhat[:, i * dc:(i + 1) * dc])
+                z = np.dot(lhat[:, i * dc:(i + 1) * dc].T, lhat[:, i * dc:(i + 1) * dc])
+
+                # update Ti
+                if dc == 1:
+                    gamma[i] = sqrt(np.dot(x, x.T)) / np.real(sqrt(z))
+                else:
+                    gamma[i] = _compute_gamma_i(z, x)
+
+                # update sigma_b for next iteration
+                sigma_b += np.dot(self.lead_field[:, i * dc:(i + 1) * dc],
+                                  np.dot(gamma[i], self.lead_field[:, i * dc:(i + 1) * dc].T))
+
+        self.Gamma[trial] = gamma
+        self.Sigma_b[trial] = sigma_b
 
         return self
 
@@ -549,7 +604,7 @@ class DstRF:
     #
     #     self._ytilde[trial] = self._meg[trial] - np.dot(np.dot(self.lead_field, inverse_kernel), y)
 
-    def fit( self, tol=1e-3, verbose=0 ):
+    def fit(self, tol=1e-3, verbose=0):
         """
 
         :return:
@@ -564,12 +619,12 @@ class DstRF:
 
         if self.orientation == 'fixed':
             dc = 1
-            g_funct = lambda x: g(x, self.mu)
-            prox_g = lambda x, t: shrink(x, self.mu * t)
+            g_funct = lambda x:g(x, self.mu)
+            prox_g = lambda x, t:shrink(x, self.mu * t)
         elif self.orientation == 'free':
             dc = 3
-            g_funct = lambda x: g_group(x, self.mu)
-            prox_g = lambda x, t: proxg_group(x, self.mu * t)
+            g_funct = lambda x:g_group(x, self.mu)
+            prox_g = lambda x, t:proxg_group(x, self.mu * t)
 
         # inverse_noise_covariance = linalg.inv(self.noise_covariance)
 
@@ -582,42 +637,19 @@ class DstRF:
 
         # run iterations
         for i in (range(self.n_iter)):
-            time.sleep(0.001)
-            for trial in range(self.n_trials):
-                self.__solve(theta, trial)
-
-            inverse_sigma_b = [linalg.inv(self.Sigma_b[trial])
-                               for trial in range(self.n_trials)]
-
-            funct = lambda x: sum(
-                [f(
-                    inverse_sigma_b[trial],
-                    self.lead_field,
-                    x,
-                    self._meg[trial],
-                    self._covariates[trial]
-                )
-                    for trial in range(self.n_trials)]
-            )
-            grad_funct = lambda x: np.array(
-                [
-                    gradf(
-                        inverse_sigma_b[trial],
-                        self.lead_field,
-                        x,
-                        self._meg[trial],
-                        self._covariates[trial])
-                    for trial in range(self.n_trials)
-                ]
-            ).sum(axis=0)
+            funct, grad_funct = self._construct_f_new()
             Theta = Fasta(funct, g_funct, grad_funct, prox_g, n_iter=self.n_iterf)
             Theta.learn(theta)
 
             self.err.append(linalg.norm(theta - Theta.coefs_, 'fro') ** 2)
+            theta = Theta.coefs_
+
+            for trial in range(self.n_trials):
+                self.__solve(theta, trial)
+
             if self.err[-1] / self.err[0] < tol:
                 break
 
-            theta = Theta.coefs_
             if verbose:
                 self.objective_vals.append(self.eval_obj())
                 print("Iteration: {:}, objective value:{:10f}".format(i, self.objective_vals[-1]))
@@ -630,8 +662,67 @@ class DstRF:
 
         return self
 
-    # Work on this
-    def get_strf( self, fs ):
+    def _construct_f(self):
+        inverse_sigma_b = [linalg.inv(self.Sigma_b[trial])
+                           for trial in range(self.n_trials)]
+
+        funct = lambda x: sum(
+            [f(
+                inverse_sigma_b[trial],
+                self.lead_field,
+                x,
+                self._meg[trial],
+                self._covariates[trial]
+            )
+                for trial in range(self.n_trials)]
+        )
+        grad_funct = lambda x: np.array(
+            [
+                gradf(
+                    inverse_sigma_b[trial],
+                    self.lead_field,
+                    x,
+                    self._meg[trial],
+                    self._covariates[trial])
+                for trial in range(self.n_trials)
+            ]
+        ).sum(axis=0)
+
+        return funct, grad_funct
+
+    def _construct_f_new(self):
+        L = [linalg.cholesky(self.Sigma_b[trial], lower=True) for trial in range(self.n_trials)]
+        leadfields = [linalg.solve(L[trial], self.lead_field) for trial in range(self.n_trials)]
+        megs = [linalg.solve(L[trial], self._meg[trial]) for trial in range(self.n_trials)]
+
+        def f(L, x, b, E):
+            y = b - np.dot(np.dot(L, x), E.T)
+
+            return 0.5 * (y ** 2).sum()
+
+        def gradf(L, x, b, E):
+            y = b - np.dot(np.dot(L, x), E.T).astype('float64')
+
+            return -np.dot(L.T, np.dot(y, E))
+
+        def funct(x):
+            val = 0.0
+            for trial in range(self.n_trials):
+                val += f(leadfields[trial], x, megs[trial], self._covariates[trial])
+
+            return val
+
+        def grad_funct(x):
+            grad = gradf(leadfields[0], x, megs[0], self._covariates[0])
+            for trial in range(1, self.n_trials):
+                grad += gradf(leadfields[trial], x, megs[trial], self._covariates[trial])
+
+            return grad
+
+        return funct, grad_funct
+
+
+    def get_strf(self, fs):
         """
 
         Updates the spatio-temporal response function as NDVar
@@ -675,12 +766,17 @@ class DstRF:
 
         return trf
 
-    def eval_obj( self ):
+    def eval_obj(self):
         v = 0
         for trial in range(self.n_trials):
             y = self._meg[trial] - np.dot(np.dot(self.lead_field, self.theta), self._covariates[trial].T)
-            Cb = np.dot(y, y.T)
-            v = v + 0.5 * np.trace(linalg.solve(self.Sigma_b[trial], Cb)) \
-                + np.sum(np.log(np.diag(linalg.cholesky(self.Sigma_b[trial]))))
 
-        return v
+            L = linalg.cholesky(self.Sigma_b[trial], lower=True)
+            y = linalg.solve(L, y)
+            v = v + 0.5 * (y ** 2).sum() + np.log(np.diag(L)).sum()
+
+            # Cb = np.dot(y, y.T)
+            # v = v + 0.5 * np.trace(linalg.solve(self.Sigma_b[trial], Cb)) \
+            #     + np.sum(np.log(np.diag(linalg.cholesky(self.Sigma_b[trial]))))
+
+        return v / self.n_trials
