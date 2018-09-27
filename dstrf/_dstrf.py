@@ -387,7 +387,8 @@ class DstRF:
             self.Sigma_b.append(self.init_sigma_b.copy())
 
         # initializing \Theta
-        self.theta = np.zeros((self.sources_n * dc, self._n_predictor_variables * self.basis.shape[1]))
+        self.theta = np.zeros((self.sources_n * dc, self._n_predictor_variables * self.basis.shape[1]),
+                              dtype='float64')
         return self
 
     def setup(self, meg, stim, normalize_regresor=True, verbose=0):
@@ -471,7 +472,7 @@ class DstRF:
 
         return self
 
-    def __solve(self, theta, trial):
+    def _solve(self, theta, trial):
         """
 
         :param theta:
@@ -623,11 +624,11 @@ class DstRF:
             self.err.append(linalg.norm(theta - Theta.coefs_, 'fro') ** 2)
             theta = Theta.coefs_
 
-            for trial in range(self.n_trials):
-                self.__solve(theta, trial)
-
             if self.err[-1] / self.err[0] < tol:
                 break
+
+            for trial in range(self.n_trials):
+                self._solve(theta, trial)
 
             if verbose:
                 self.objective_vals.append(self.eval_obj())
