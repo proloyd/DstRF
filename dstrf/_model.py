@@ -570,6 +570,16 @@ class DstRF_new:
 
         return v / len(data)
 
+    def eval_cv(self, data):
+        v = 0
+        for meg, covariate, key in data:
+            y = meg - np.dot(np.dot(self.lead_field, self.theta), covariate.T)
+            L = linalg.cholesky(self.Sigma_b[key], lower=True)
+            y = linalg.solve(L, y)
+            v = v + 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
+
+        return v / len(data)
+
     def get_strf(self, data):
         """
 
