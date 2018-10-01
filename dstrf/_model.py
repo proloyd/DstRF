@@ -370,6 +370,8 @@ class DstRF_new:
         self.n_iterf = n_iterf
 
         self.__init__vars()
+        self._init_Sigma_b = None
+        self._init_Gamma = None
 
     def __init__vars(self):
         wf = linalg.cholesky(self.noise_covariance, lower=True)
@@ -381,17 +383,32 @@ class DstRF_new:
         return self
 
     def __init__iter(self, data):
-        self.Gamma = {}
-        self.Sigma_b = {}
         dc = orientation[self.orientation]
-        for key in data.datakeys:
-            self.Gamma[key] = [self.eta * np.eye(dc, dtype='float64') for _ in range(self.sources_n)]
-            self.Sigma_b[key] = self.init_sigma_b.copy()
+        if self._init_Gamma is None:
+            self.Gamma = {}
+            self.Sigma_b = {}
+            for key in data.datakeys:
+                self.Gamma[key] = [self.eta * np.eye(dc, dtype='float64') for _ in range(self.sources_n)]
+                self.Sigma_b[key] = self.init_sigma_b.copy()
 
-        self.keys = data.datakeys.copy()
-        # initializing \Theta
-        self.theta = np.zeros((self.sources_n * dc, data._n_predictor_variables * data.basis.shape[1]),
-                              dtype='float64')
+            self.keys = data.datakeys.copy()
+            # initializing \Theta
+            self.theta = np.zeros((self.sources_n * dc, data._n_predictor_variables *
+                                   data.basis.shape[1]),
+                                  dtype='float64')
+
+            self._solve(data, self.theta, n_iterc=200)
+            self._init_Gamma = self.Gamma.copy()
+            self._init_Sigma_b = self.Sigma_b.copy()
+
+        else:
+            print('Initializations already exists!')
+            self.Gamma = self._init_Gamma.copy()
+            self.Sigma_b = self._init_Sigma_b.copy()
+            # initializing \Theta
+            self.theta = np.zeros((self.sources_n * dc, data._n_predictor_variables *
+                                   data.basis.shape[1]),
+                                  dtype='float64')
         return self
 
     def _set_mu(self, mu, data):
@@ -412,6 +429,8 @@ class DstRF_new:
 
         idx = kwargs.get('idx', slice(None, None))
 
+        n_iterc = kwargs.get('n_iterc', self.n_iterc)
+
         for meg, covariates, key in data:
             meg = meg[idx]
             covariates = covariates[idx]
@@ -422,7 +441,7 @@ class DstRF_new:
             sigma_b = self.Sigma_b[key].copy()
 
             # champagne iterations
-            for it in range(self.n_iterc):
+            for it in range(n_iterc):
                 # pre-compute some useful matrices
                 Lc = linalg.cholesky(sigma_b, lower=True)
                 lhat = linalg.solve(Lc, self.lead_field)
