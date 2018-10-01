@@ -10,10 +10,8 @@ from scipy import linalg
 import time
 
 
-def _next_stepsize( deltax, deltaF ):
-    """
-
-    A variation of spectral descent step-size selection: 'adaptive' BB method.
+def _next_stepsize(deltax, deltaF):
+    """A variation of spectral descent step-size selection: 'adaptive' BB method.
 
     Reference:
     ---------
@@ -32,11 +30,10 @@ def _next_stepsize( deltax, deltaF ):
     -------
     float
     adaptive step-size
-
     """
-    n_deltax = linalg.norm (deltax, 'fro') ** 2
-    n_deltaF = linalg.norm (deltaF, 'fro') ** 2
-    innerproduct_xF = np.real(np.sum (deltax * deltaF))
+    n_deltax = (deltax ** 2).sum()  # linalg.norm(deltax, 'fro') ** 2
+    n_deltaF = (deltaF ** 2).sum()  # linalg.norm(deltaF, 'fro') ** 2
+    innerproduct_xF = np.real((deltax * deltaF).sum())
 
     if n_deltax == 0:
         return 0
@@ -53,7 +50,7 @@ def _next_stepsize( deltax, deltaF ):
             return tau_s - 0.5 * tau_m
 
 
-def _compute_residual( deltax, deltaF, tau ):
+def _compute_residual(deltax, deltaF, tau):
     """
 
     Compute Residual at given step
@@ -74,7 +71,8 @@ def _compute_residual( deltax, deltaF, tau ):
     float
     residual at current step
     """
-    return linalg.norm (deltaF - deltax / tau, 'fro') ** 2
+    # linalg.norm(deltaF - deltax / tau, 'fro') ** 2
+    return ((deltaF - deltax) ** 2).sum() / (tau ** 2)
 
 
 def _update_coefs(x, tau, gradfx, prox, f, beta, fk):
@@ -111,13 +109,14 @@ def _update_coefs(x, tau, gradfx, prox, f, beta, fk):
         next coefficients
 
     """
-    z = prox (x - tau * gradfx, tau)
-    fz =  f(z)
+    z = prox(x - tau * gradfx, tau)
+    fz = f(z)
     count = 0
-    while fz > fk + np.sum (gradfx * (z - x)) + np.square (linalg.norm (z - x, 'fro')) / (2 * tau):
+    while fz > fk + (gradfx * (z - x)).sum() + ((z - x) ** 2).sum() / (2 * tau):
+        # np.square(linalg.norm(z - x, 'fro')) / (2 * tau):
         count += 1
         tau = beta * tau
-        z = prox (x - tau * gradfx, tau)
+        z = prox(x - tau * gradfx, tau)
         fz = f(z)
 
     return z, fz, tau, count
@@ -195,7 +194,8 @@ class Fasta:
     >>> def gradf(x): return np.dot(A.T, np.dot(A, x) - b)  # gradient of f(x)
     >>> def g(x): return mu * linalg.norm(x, 1)  # mu|x|
     >>> def proxg(x, t): return shrink(x, mu*t)
-    >>> def shrink(x, mu): return np.multiply(np.sign(x), np.maximum(np.abs(x) - mu, 0)) #proxg(z,t) = sign(x)*max(|x|-mu,0)
+    >>> def shrink(x, mu): return np.multiply(np.sign(x), np.maximum(np.abs(x) - mu, 0)) #proxg(z,t) = sign(x)*max(
+    |x|-mu,0)
     Create FASTA instance
     >>> lsq = Fasta(f, g, gradf, proxg)
     Call solver
@@ -237,14 +237,14 @@ class Fasta:
         self
         """
         coefs_current = np.copy(coefs_init)
-        grad_current = self.grad (coefs_current)
+        grad_current = self.grad(coefs_current)
         coefs_next = coefs_current \
                      + 0.01 * np.random.randn(coefs_current.shape[0], coefs_current.shape[1])
         grad_next = self.grad(coefs_next)
         tau_current = _next_stepsize(coefs_next - coefs_current,
-                             grad_next - grad_current)
+                                     grad_next - grad_current)
 
-        self._funcValues.append (self.f (coefs_current))
+        self._funcValues.append(self.f(coefs_current))
         if verbose == 1:
             self.objective = []
             self.objective.append(self._funcValues[-1] + self.g(coefs_current))
@@ -275,17 +275,18 @@ class Fasta:
                 self.stepsizes.append(tau)
                 self.backtracks.append(n_backtracks)
                 self.objective.append(objective_next + self.g(coefs_next))
-                print("Iteration : {:}, objective value : {:f}, stepsize : {:f},"
-                      " backtracking steps taken: {:}, residual : {:f} \n".format(
-                       i+1, self.objective[i], self.stepsizes[i], self.backtracks[i], self.residuals[i]
-                                                                                  )
-                )
+                print("Iteration : {:}, objective value : {:f}, "
+                      "stepsize : {:f}, backtracking steps taken: {:}, "
+                      "residual : {:f} \n".format(i + 1, self.objective[i],
+                                                  self.stepsizes[i],
+                                                  self.backtracks[i],
+                                                  self.residuals[i]))
 
             # Prepare for next iteration
             coefs_current = coefs_next
             grad_current = grad_next
 
-            if tau_next == 0 or residual < tol:    # convergence reached
+            if tau_next == 0 or residual < tol:  # convergence reached
                 break
             elif tau_next < 0:  # non-convex probelms ->  negative stepsize -> use the previous value
                 tau_current = tau

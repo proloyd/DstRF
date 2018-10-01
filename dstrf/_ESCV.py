@@ -17,9 +17,10 @@ class DstRFcv(DstRF):
         if ES:
             self._es_stim = []
 
-    def setup_cv(self, meg, stim, train, test, normalize_regresor=False):
+    def setup_cv(self, meg, stim, normalize_regresor=False):
         y = meg.get_data(('sensor', 'time'))
         y = y[:, self.basis.shape[1]:]
+        self._testmeg.append(y / sqrt(y.shape[1]))
 
         covariates = np.dot(covariate_from_stim(stim, self.filter_length, normalize=normalize_regresor),
                             self.basis) / sqrt(y.shape[1])
@@ -28,20 +29,25 @@ class DstRFcv(DstRF):
             covariates = covariates.swapaxes(1, 0)
 
         first_dim = covariates.shape[0]
-        covariates = covariates.reshape(first_dim, -1)
-        # train
-        y_train = y[:, train]
-        x_train = covariates[train, :]
-        self._meg.append(y_train / sqrt(y_train.shape[1]))  # Mind the normalization
-        self._covariates.append(x_train)
-        # test
-        y_test = y[:, test]
-        x_test = covariates[test, :]
-        self._testmeg.append(y_test / sqrt(y_test.shape[1]))
-        self._teststim.append(x_test)
+        self._teststim.append(covariates.reshape(first_dim, -1))
         # self._teststim.append(np.dot(covariate_from_stim(stim, self.filter_length, normalize=normalize_regresor),
         #                       self.basis)/sqrt(y.shape[1]))
 
+    def prep_cv(self, train, test):
+        for trial in range(self.n_trials):
+            # train
+            N = len(train) + len(test)
+            y_train = self._meg[trial][:, train]
+            x_train = self._covariates[trial][train, :]
+            # test
+            y_test = self._meg[trial][:, test]
+            x_test = self._covariates[trial][test, :]
+            self._meg[trial] = sqrt(N) * (y_train / sqrt(y_train.shape[1]))  # Mind the normalization
+            self._covariates[trial] = (x_train)
+            self._testmeg.append( sqrt(N) * y_test / sqrt(y_test.shape[1]))
+            self._teststim.append(x_test)
+        # self._teststim.append(np.dot(covariate_from_stim(stim, self.filter_length, normalize=normalize_regresor),
+        #                       self.basis)/sqrt(y.shape[1]))
     def setup_es(self, stim):
         covariates = np.dot(covariate_from_stim(stim, self.filter_length, normalize=True),
                             self.basis)
@@ -108,7 +114,7 @@ def compute_ES_metric(models):
     for model in models:
         y = np.empty(0)
         for trial in range(model.n_trials):
-            y = np.append(y, np.dot(np.dot(model.lead_field, model.theta), model._es_stim[trial].T))
+            y = np.append(y, np.dot(np.dot(model.lead_field, model.theta), model._teststim[trial].T))
         Y.append(y)
     Y = np.array(Y)
     Y_bar = Y.mean(axis=0)
