@@ -5,6 +5,7 @@ from math import sqrt
 from ._basis import gaussian_basis
 from ._fastac import Fasta
 import time
+import ipdb
 
 orientation = {'fixed': 1, 'free': 3}
 
@@ -206,11 +207,13 @@ def _compute_gamma_i(z, x):
 
     """
     [e, v] = linalg.eig(z)
+    e = e.real
     e[e < 0] = 0
     temp = np.dot(x.T, v)
-    temp = np.real(np.dot(temp.T, temp))
+    temp = np.real(np.dot(np.conj(temp.T), temp))
     e = np.sqrt(e)
     [d, u] = linalg.eig((temp * e) * e[:, np.newaxis])
+    d = d.real
     d[d < 0] = 0
     d = np.sqrt(d)
     temp = np.dot(v * _myinv(np.real(e)), u)
@@ -283,6 +286,7 @@ class REG_Data:
         regdata_ = REG_Data(self.filter_length)
         regdata_.datakeys = self.datakeys
         regdata_._n_predictor_variables = self._n_predictor_variables
+        regdata_.tstep = self.tstep
         regdata_._norm_factor = sqrt(len(idx))
         for key in regdata_.datakeys:
             regdata_.meg[key] = self.meg[key][:, idx] * self._norm_factor / regdata_._norm_factor
@@ -362,6 +366,10 @@ class DstRF_new:
             self.lead_field = lead_field.get_data(dims=('sensor', 'source')).astype('float64')
             self.sources_n = self.lead_field.shape[1]
             self.orientation = 'fixed'
+
+        self.lead_field_scaling = linalg.norm(self.lead_field, 2)
+        self.lead_field /= self.lead_field_scaling
+
         self.source = lead_field.source
         self.sensor = lead_field.sensor
         self.noise_covariance = noise_covariance
@@ -384,31 +392,43 @@ class DstRF_new:
 
     def __init__iter(self, data):
         dc = orientation[self.orientation]
-        if self._init_Gamma is None:
-            self.Gamma = {}
-            self.Sigma_b = {}
-            for key in data.datakeys:
-                self.Gamma[key] = [self.eta * np.eye(dc, dtype='float64') for _ in range(self.sources_n)]
-                self.Sigma_b[key] = self.init_sigma_b.copy()
+        self.Gamma = {}
+        self.Sigma_b = {}
+        for key in data.datakeys:
+            self.Gamma[key] = [self.eta * np.eye(dc, dtype='float64') for _ in range(self.sources_n)]
+            self.Sigma_b[key] = self.init_sigma_b.copy()
 
-            self.keys = data.datakeys.copy()
-            # initializing \Theta
-            self.theta = np.zeros((self.sources_n * dc, data._n_predictor_variables *
-                                   data.basis.shape[1]),
-                                  dtype='float64')
-
-            self._solve(data, self.theta, n_iterc=200)
-            self._init_Gamma = self.Gamma.copy()
-            self._init_Sigma_b = self.Sigma_b.copy()
-
-        else:
-            print('Initializations already exists!')
-            self.Gamma = self._init_Gamma.copy()
-            self.Sigma_b = self._init_Sigma_b.copy()
-            # initializing \Theta
-            self.theta = np.zeros((self.sources_n * dc, data._n_predictor_variables *
-                                   data.basis.shape[1]),
-                                  dtype='float64')
+        self.keys = data.datakeys.copy()
+        # initializing \Theta
+        self.theta = np.zeros((self.sources_n * dc, data._n_predictor_variables *
+                               data.basis.shape[1]),
+                              dtype='float64')
+        # if self._init_Gamma is None:
+        #     self.Gamma = {}
+        #     self.Sigma_b = {}
+        #     for key in data.datakeys:
+        #         self.Gamma[key] = [self.eta * np.eye(dc, dtype='float64') for _ in range(self.sources_n)]
+        #         self.Sigma_b[key] = self.init_sigma_b.copy()
+        #
+        #     self.keys = data.datakeys.copy()
+        #     # initializing \Theta
+        #     self.theta = np.zeros((self.sources_n * dc, data._n_predictor_variables *
+        #                            data.basis.shape[1]),
+        #                           dtype='float64')
+        #
+        #     self._solve(data, self.theta, n_iterc=1)
+        #     self._init_Gamma = self.Gamma.copy()
+        #     self._init_Sigma_b = self.Sigma_b.copy()
+        #
+        # else:
+        #     print('Initializations already exists!')
+        #     self.Gamma = self._init_Gamma.copy()
+        #     self.Sigma_b = self._init_Sigma_b.copy()
+        #     # initializing \Theta
+        #     self.theta = np.zeros((self.sources_n * dc, data._n_predictor_variables *
+        #                            data.basis.shape[1]),
+        #                           dtype='float64')
+        # ipdb.set_trace()
         return self
 
     def _set_mu(self, mu, data):
@@ -437,7 +457,7 @@ class DstRF_new:
             y = meg - np.dot(np.dot(self.lead_field, theta), covariates.T)
             Cb = np.dot(y, y.T)  # empirical data covariance
             yhat = linalg.cholesky(Cb, lower=True)
-            gamma = self.Gamma[key]
+            gamma = self.Gamma[key].copy()
             sigma_b = self.Sigma_b[key].copy()
 
             # champagne iterations
@@ -502,16 +522,19 @@ class DstRF_new:
 
         # run iterations
         for i in (range(self.n_iter)):
+            if verbose:
+                print('iteration: %i:' % i)
             funct, grad_funct = self._construct_f(data, **kwargs)
             Theta = Fasta(funct, g_funct, grad_funct, prox_g, n_iter=self.n_iterf)
             Theta.learn(theta)
-
-            # import pdb
-            # pdb.set_trace()
+            # ipdb.set_trace()
 
             self.err.append(self._residual(theta, Theta.coefs_))
             theta = Theta.coefs_
             self.theta = theta
+
+            if verbose:
+                print('objective after fasta: %10f' % self.eval_obj(data))
 
             if self.err[-1] < tol:
                 break
@@ -520,8 +543,8 @@ class DstRF_new:
 
             if verbose:
                 self.objective_vals.append(self.eval_obj(data))
-                print("Iteration: {:}, objective value:{:10f}, "
-                      "%% change:{:2f}".format(i, self.objective_vals[-1], self.err[-1]*100))
+                print("objective value after champ:{:10f}\n "
+                      "%% change:{:2f}".format(self.objective_vals[-1], self.err[-1]*100))
 
         if verbose:
             end = time.time()
@@ -576,6 +599,16 @@ class DstRF_new:
             y = meg - np.dot(np.dot(self.lead_field, self.theta), covariate.T)
             L = linalg.cholesky(self.Sigma_b[key], lower=True)
             y = linalg.solve(L, y)
+            v = v + 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
+
+        return v / len(data)
+
+    def eval_cv1(self, data):
+        v = 0
+        for meg, covariate, key in data:
+            y = meg - np.dot(np.dot(self.lead_field, self.theta), covariate.T)
+            # L = linalg.cholesky(self.Sigma_b[key], lower=True)
+            # y = linalg.solve(L, y)
             v = v + 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
 
         return v / len(data)

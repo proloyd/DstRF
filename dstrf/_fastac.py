@@ -216,7 +216,7 @@ class Fasta:
     def __str__(self):
         return "Fast adaptive shrinkage/thresholding Algorithm instance"
 
-    def learn(self, coefs_init, tol=1e-8, verbose=0):
+    def learn(self, coefs_init, tol=1e-2, verbose=0):
         """
 
         parameters
