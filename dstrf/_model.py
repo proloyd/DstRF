@@ -538,7 +538,8 @@ class DstRF_new:
             prox_g = lambda x, t: shrink(x, self.mu * t)
         elif self.orientation == 'free':
             g_funct = lambda x: g_group(x, self.mu)
-            prox_g = lambda x, t: proxg_group(x, self.mu * t)
+            # prox_g = lambda x, t: proxg_group(x, self.mu * t)
+            prox_g = lambda x, t: proxg_group_opt(x, self.mu * t)
 
         theta = self.theta
 
