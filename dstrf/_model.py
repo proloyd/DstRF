@@ -2,9 +2,12 @@ import numpy as np
 from scipy import linalg
 from eelbrain import *
 from math import sqrt
+import time
+
 from ._basis import gaussian_basis
 from ._fastac import Fasta
-import time
+from . import opt
+
 import ipdb
 
 orientation = {'fixed': 1, 'free': 3}
@@ -116,6 +119,26 @@ def proxg_group(z, mu):
     return x
 
 
+def proxg_group_opt(z, mu):
+    """
+    proximal operator for gg(x):
+
+            prox_{mu gg}(x) = min  gg(z) + 1/ (2 * mu) ||x-z|| ** 2
+                    x_s = max(1 - mu/||z_s||, 0) z_s
+
+    Note: It does update the supplied z.
+    :param x : strf corresponding to one trial,
+            (N,M) 2D array
+    :param mu: regularizing parameter
+            scalar float
+
+    :return prox_{mu gg}(x)
+            (N,M) 2D array
+    """
+    opt.cproxg_group(z, mu, 3, z)
+    return z
+
+
 def covariate_from_stim(stim, M, normalize=False):
     """
     From covariate matrix from stimulus
@@ -210,14 +233,14 @@ def _compute_gamma_i(z, x):
     e = e.real
     e[e < 0] = 0
     temp = np.dot(x.T, v)
-    temp = np.real(np.dot(np.conj(temp.T), temp))
+    temp = np.real(np.dot(temp.conj().T, temp))
     e = np.sqrt(e)
     [d, u] = linalg.eig((temp * e) * e[:, np.newaxis])
     d = d.real
     d[d < 0] = 0
     d = np.sqrt(d)
     temp = np.dot(v * _myinv(np.real(e)), u)
-    return np.array(np.real(np.dot(temp * d, np.matrix(temp).H)))
+    return np.array(np.real(np.dot(temp * d, temp.conj().T)))
 
 
 class REG_Data:
@@ -236,7 +259,7 @@ class REG_Data:
         self.tstep = None
         self._norm_factor = None
 
-    def load(self, key, meg, stim, normalize_regresor=True, verbose=0):
+    def load(self, key, meg, stim, normalize_regresor=False, verbose=0):
         """
 
         :param meg:
@@ -253,7 +276,7 @@ class REG_Data:
 
         # add meg data
         y = meg.get_data(('sensor', 'time'))
-        y = y[:, self.basis.shape[1]:].astype('float64')
+        y = y[:, self.basis.shape[0]-1:].astype('float64')
         self.meg[key] = y / sqrt(y.shape[1])  # Mind the normalization
 
         if self._norm_factor is None:
@@ -261,7 +284,7 @@ class REG_Data:
 
         # add corresponding covariate matrix
         covariates = np.dot(covariate_from_stim(stim, self.filter_length, normalize=normalize_regresor),
-                            self.basis) / sqrt(y.shape[1])
+                            self.basis) / sqrt(y.shape[1])  # Mind the normalization
         if covariates.ndim > 2:
             self._n_predictor_variables = covariates.shape[0]
             covariates = covariates.swapaxes(1, 0)
@@ -277,6 +300,9 @@ class REG_Data:
     def __len__(self):
         return len(self.datakeys)
 
+    def __repr__(self):
+        return 'Regression data'
+
     def timeslice(self, idx):
         """
 
@@ -290,7 +316,8 @@ class REG_Data:
         regdata_._norm_factor = sqrt(len(idx))
         for key in regdata_.datakeys:
             regdata_.meg[key] = self.meg[key][:, idx] * self._norm_factor / regdata_._norm_factor
-            regdata_.covariates[key] = self.covariates[key][idx, :]
+            regdata_.covariates[key] = self.covariates[key][idx, :] * self._norm_factor / regdata_._norm_factor
+            # Take care of the normalization too
 
         return regdata_
 
@@ -686,6 +713,7 @@ class DstRF_new:
 
         return VarY / (Y_bar ** 2).sum()
 
+
 if __name__ == '__main__':
     from scipy import io
     import pickle
@@ -745,3 +773,8 @@ if __name__ == '__main__':
             data = resample(y, 200)
             R.load(key, data, stims, False)
     print('Packing Done')
+
+
+setup = """from dstrf._model import proxg_group, proxg_group_opt 
+import numpy as np
+y = np.random.uniform(0, 1, (9000, 200))"""
