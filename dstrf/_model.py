@@ -135,7 +135,11 @@ def proxg_group_opt(z, mu):
     :return prox_{mu gg}(x)
             (N,M) 2D array
     """
-    opt.cproxg_group(z, mu, 3, z)
+    # x = z.view()
+    l = z.shape[1]
+    z.shape = (-1, 3, l)
+    opt.cproxg_group(z, mu, z)
+    z.shape = (-1, l)
     return z
 
 
