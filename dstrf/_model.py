@@ -4,11 +4,15 @@ from eelbrain import *
 from math import sqrt
 import time
 
+# Some specialized functions
+from numpy.core.umath_tests import inner1d
+
 from ._basis import gaussian_basis
 from ._fastac import Fasta
 from . import opt
+from .dsyevh3C import compute_gamma_c
 
-import ipdb
+# import ipdb
 
 orientation = {'fixed': 1, 'free': 3}
 
@@ -247,6 +251,12 @@ def _compute_gamma_i(z, x):
     return np.array(np.real(np.dot(temp * d, temp.conj().T)))
 
 
+def _compute_gamma_ip(z, x, gamma):
+    a = np.dot(x, x.T)
+    compute_gamma_c(z, a, gamma)
+    return
+
+
 class REG_Data:
     """Data Container for regression problem
 
@@ -280,7 +290,7 @@ class REG_Data:
 
         # add meg data
         y = meg.get_data(('sensor', 'time'))
-        y = y[:, self.basis.shape[0]-1:].astype('float64')
+        y = y[:, self.basis.shape[0]-1:].astype(np.float64)
         self.meg[key] = y / sqrt(y.shape[1])  # Mind the normalization
 
         if self._norm_factor is None:
@@ -294,9 +304,18 @@ class REG_Data:
             covariates = covariates.swapaxes(1, 0)
 
         first_dim = covariates.shape[0]
-        self.covariates[key] = covariates.reshape(first_dim, -1).astype('float64')
+        self.covariates[key] = covariates.reshape(first_dim, -1).astype(np.float64)
 
         return self
+
+    def _precompute(self):
+        self._bbt = []
+        self._bE = []
+        self._EtE = []
+        for b, E, _ in self:
+            self._bbt.append(np.dot(b, b.T))
+            self._bE.append(np.dot(b, E))
+            self._EtE.append(np.dot(E.T, E))
 
     def __iter__(self):
         return ((self.meg[key], self.covariates[key], key) for key in self.datakeys)
@@ -388,13 +407,13 @@ class DstRF_new:
 
     def __init__(self, lead_field, noise_covariance, n_iter=30, n_iterc=1000, n_iterf=1000):
         if lead_field.has_dim('space'):
-            self.lead_field = lead_field.get_data(dims=('sensor', 'source', 'space')).astype('float64')
+            self.lead_field = lead_field.get_data(dims=('sensor', 'source', 'space')).astype(np.float64)
             self.sources_n = self.lead_field.shape[1]
             self.lead_field = self.lead_field.reshape(self.lead_field.shape[0], -1)
             self.orientation = 'free'
             self.space = lead_field.space
         else:
-            self.lead_field = lead_field.get_data(dims=('sensor', 'source')).astype('float64')
+            self.lead_field = lead_field.get_data(dims=('sensor', 'source')).astype(np.float64)
             self.sources_n = self.lead_field.shape[1]
             self.orientation = 'fixed'
 
@@ -403,7 +422,7 @@ class DstRF_new:
 
         self.source = lead_field.source
         self.sensor = lead_field.sensor
-        self.noise_covariance = noise_covariance
+        self.noise_covariance = noise_covariance.astype(np.float64)
         self.n_iter = n_iter
         self.n_iterc = n_iterc
         self.n_iterf = n_iterf
@@ -426,14 +445,14 @@ class DstRF_new:
         self.Gamma = {}
         self.Sigma_b = {}
         for key in data.datakeys:
-            self.Gamma[key] = [self.eta * np.eye(dc, dtype='float64') for _ in range(self.sources_n)]
+            self.Gamma[key] = [self.eta * np.eye(dc, dtype=np.float64) for _ in range(self.sources_n)]
             self.Sigma_b[key] = self.init_sigma_b.copy()
 
         self.keys = data.datakeys.copy()
         # initializing \Theta
         self.theta = np.zeros((self.sources_n * dc, data._n_predictor_variables *
                                data.basis.shape[1]),
-                              dtype='float64')
+                              dtype=np.float64)
         # if self._init_Gamma is None:
         #     self.Gamma = {}
         #     self.Sigma_b = {}
@@ -465,9 +484,10 @@ class DstRF_new:
     def _set_mu(self, mu, data):
         self.mu = mu
         self.__init__iter(data)
+        data._precompute()
         return self
 
-    def _solve(self, data, theta, **kwargs):
+    def _solve(self, data, theta, use_optimized=True, **kwargs):
         """
 
         :param theta:
@@ -481,6 +501,8 @@ class DstRF_new:
         idx = kwargs.get('idx', slice(None, None))
 
         n_iterc = kwargs.get('n_iterc', self.n_iterc)
+
+        use_optimized = kwargs.get('use_optimized', use_optimized)
 
         for meg, covariates, key in data:
             meg = meg[idx]
@@ -514,7 +536,12 @@ class DstRF_new:
                     if dc == 1:
                         gamma[i] = sqrt(np.dot(x, x.T)) / np.real(sqrt(z))
                     else:
-                        gamma[i] = _compute_gamma_i(z, x)
+                        # import ipdb
+                        # ipdb.set_trace()
+                        if use_optimized:
+                            _compute_gamma_ip(z, x, gamma[i])
+                        else:
+                            gamma[i] = _compute_gamma_i(z, x)
 
                     # update sigma_b for next iteration
                     sigma_b += np.dot(self.lead_field[:, i * dc:(i + 1) * dc],
@@ -584,34 +611,62 @@ class DstRF_new:
 
         return self
 
-    def _construct_f(self, data):
+    def _construct_f(self, data, use_optimized=True, **kwargs):
         L = [linalg.cholesky(self.Sigma_b[key], lower=True) for key in self.keys]
         leadfields = [linalg.solve(L[trial], self.lead_field) for trial in range(len(self.keys))]
-        megs = [linalg.solve(L[trial], data.meg[key]) for trial, key in enumerate(data.datakeys)]
 
-        def f(L, x, b, E):
-            y = b - np.dot(np.dot(L, x), E.T)
+        if kwargs.get('use_optimized', use_optimized):
+            bEs = [linalg.solve(L[trial], data._bE[trial]) for trial, key in enumerate(data.datakeys)]
+            bbts = [np.trace(linalg.solve(L[trial], linalg.solve(L[trial], data._bbt[trial]).T))
+                   for trial, key in enumerate(data.datakeys)]
 
-            return 0.5 * (y ** 2).sum()
+            def f(L, x, bbt, bE, EtE):
+                Lx = np.dot(L, x)
+                y = bbt - 2 * np.sum(inner1d(bE, Lx)) + np.sum(inner1d(Lx, np.dot(Lx, EtE)))
+                return 0.5 * y
 
-        def gradf(L, x, b, E):
-            y = b - np.dot(np.dot(L, x), E.T)
+            def gradf(L, x, bE, EtE):
+                y = bE - np.dot(np.dot(L, x), EtE)
+                return -np.dot(L.T, y)
 
-            return -np.dot(L.T, np.dot(y, E))
+            def funct(x):
+                fval = 0.0
+                for trial, key in enumerate(self.keys):
+                    fval += f(leadfields[trial], x, bbts[trial], bEs[trial], data._EtE[trial])
+                return fval
 
-        def funct(x):
-            val = 0.0
-            for trial, key in enumerate(self.keys):
-                val += f(leadfields[trial], x, megs[trial], data.covariates[key])
+            def grad_funct(x):
+                grad = gradf(leadfields[0], x, bEs[0], data._EtE[0])
+                for trial, key in enumerate(self.keys[1:]):
+                    grad += gradf(leadfields[trial+1], x, bEs[trial+1], data._EtE[trial+1])
+                return grad
 
-            return val
+        else:
+            megs = [linalg.solve(L[trial], data.meg[key]) for trial, key in enumerate(data.datakeys)]
 
-        def grad_funct(x):
-            grad = gradf(leadfields[0], x, megs[0], data.covariates[self.keys[0]])
-            for trial, key in enumerate(self.keys[1:]):
-                grad += gradf(leadfields[trial], x, megs[trial], data.covariates[key])
+            def f(L, x, b, E):
+                y = b - np.dot(np.dot(L, x), E.T)
 
-            return grad
+                return 0.5 * (y ** 2).sum()
+
+            def gradf(L, x, b, E):
+                y = np.dot(b, E) - np.dot(np.dot(L, x), np.dot(E.T, E))
+
+                return -np.dot(L.T, y)
+
+            def funct(x):
+                val = 0.0
+                for trial, key in enumerate(self.keys):
+                    val += f(leadfields[trial], x, megs[trial], data.covariates[key])
+
+                return val
+
+            def grad_funct(x):
+                grad = gradf(leadfields[0], x, megs[0], data.covariates[self.keys[0]])
+                for trial, key in enumerate(self.keys[1:]):
+                    grad += gradf(leadfields[trial+1], x, megs[trial+1], data.covariates[key])
+
+                return grad
 
         return funct, grad_funct
 

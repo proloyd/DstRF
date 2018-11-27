@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 import numpy as np
 
 # Use cython only if *.pyx files are present (i.e., not in sdist)
-ext_paths = ('dstrf/*%s', )
+ext_paths = ('dstrf/*%s', 'dstrf/dsyevh3C/*%s')
 if glob(ext_paths[0] % '.pyx'):
     from Cython.Build import cythonize
 
