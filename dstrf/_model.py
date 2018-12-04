@@ -1,3 +1,4 @@
+# Author: Proloy Das <proloy@umd.edu>
 import numpy as np
 from scipy import linalg
 from eelbrain import *
@@ -11,7 +12,6 @@ from ._fastac import Fasta
 from . import opt
 from .dsyevh3C import compute_gamma_c
 
-# import ipdb
 
 orientation = {'fixed': 1, 'free': 3}
 

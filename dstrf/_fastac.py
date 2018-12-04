@@ -1,9 +1,5 @@
-"""
-Module implementing the FASTA algorithm
-"""
-
-__author__ = 'Proloy DAS'
-__licence__ = 'apache 2.0'
+# Author: Proloy Das <proloy@umd.edu>
+"""Module implementing the FASTA algorithm"""
 
 import numpy as np
 from scipy import linalg
@@ -51,9 +47,7 @@ def _next_stepsize(deltax, deltaF):
 
 
 def _compute_residual(deltax, deltaF, tau):
-    """
-
-    Compute Residual at given step
+    """Compute Residual at given step
 
    parameters
     ----------
@@ -76,9 +70,7 @@ def _compute_residual(deltax, deltaF, tau):
 
 
 def _update_coefs(x, tau, gradfx, prox, f, beta, fk):
-    """
-
-    Non-monotone line search
+    """Non-monotone line search
 
     parameters
     ----------
@@ -123,9 +115,7 @@ def _update_coefs(x, tau, gradfx, prox, f, beta, fk):
 
 
 class Fasta:
-    """
-
-    Fast adaptive shrinkage/thresholding Algorithm
+    """Fast adaptive shrinkage/thresholding Algorithm
 
     Reference
     ---------
@@ -217,7 +207,7 @@ class Fasta:
         return "Fast adaptive shrinkage/thresholding Algorithm instance"
 
     def learn(self, coefs_init, tol=1e-2, verbose=0):
-        """
+        """fits the model using FASTA algorithm
 
         parameters
         ----------
