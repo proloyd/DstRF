@@ -23,19 +23,20 @@ Eelbrain ([Download/ Installation Instructions](https://eelbrain.readthedocs.io/
  1. Clone the repo and install using pip.
  3. Suppose we are interested in subject `XXXX`.
  2. Create forward source model using MNE-python. Convert it into NDVar format and save as a pickled file
- under `fwdsol` folder. `XXXX-vol-7-fwd.pickled`
+ under `fwdsol` folder:  
+  `XXXX-vol-7-fwd.pickled`
  3. Create `predictors` folder containing pickled stimulus variables for differnt conditions in NDVar format:
- Suppose there are two conditions, then the file contains: 
-    `stim_h.pickled`
+ Suppose there are two conditions, then the file contains:   
+    `stim_h.pickled`  
     `stim_l.pickled`
  4. Create `meg_XXXX` folder containing pickled meg recordings in NDVar format:
- Suppose there are three repeatations for each conditions, then this folder contains:
-    `meg_h0.pickled`
-    `meg_h1.pickled`
-    `meg_h2.pickled`
-    `meg_l0.pickled`
-    `meg_l1.pickled`
-    `meg_l2.pickled`
+ Suppose there are three repeatations for each conditions, then this folder contains:  
+    `meg_h0.pickled`  
+    `meg_h1.pickled`  
+    `meg_h2.pickled`  
+    `meg_l0.pickled`  
+    `meg_l1.pickled`  
+    `meg_l2.pickled`  
     Don't forget to put the empty room recordings `emptyroom.pickled` in the same folder.  
  5. Change the ROOTDIR in config.py to the folder containing all these folders.
  Also change the max # of iterations as suited. But default values should do just fine!
