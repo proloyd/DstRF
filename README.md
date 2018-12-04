@@ -25,12 +25,12 @@ Eelbrain ([Download/ Installation Instructions](https://eelbrain.readthedocs.io/
  2. Create forward source model using MNE-python. Convert it into NDVar format and save as a pickled file
  under `fwdsol` folder:  
   `XXXX-vol-7-fwd.pickled`
- 3. Create `predictors` folder containing pickled stimulus variables for differnt conditions in NDVar format:
+ 3. Create `predictors` folder containing pickled stimulus variables for different conditions in NDVar format:
  Suppose there are two conditions, then the file contains:   
     `stim_h.pickled`  
     `stim_l.pickled`
  4. Create `meg_XXXX` folder containing pickled meg recordings in NDVar format:
- Suppose there are three repeatations for each conditions, then this folder contains:  
+ Suppose there are three repetitions for each conditions, then this folder contains:  
     `meg_h0.pickled`  
     `meg_h1.pickled`  
     `meg_h2.pickled`  
@@ -55,9 +55,9 @@ Results
 -------
 We applied the algorithm on a subset of MEG data collected from 17 adults (aged 18-27 years) under an auditory task 
 described in the papers. In short, during the task, the participants listened to `1 min` long segments from 
-an audiobook recording of [The Legend of Sleepy Hollow by Washington Irving](https://librivox.org/the-legend-of-sleepy-hollow-by-washington-irving/) 
+an audio-book recording of [The Legend of Sleepy Hollow by Washington Irving](https://librivox.org/the-legend-of-sleepy-hollow-by-washington-irving/) 
 , narrated by a male speaker. We consider localizing the TRFs using a total of `6 min` data from each participant. 
-MNE-python 0.14 was used in preprocessing the raw data to automatically detect and discard flat channels, remove 
+MNE-python 0.14 was used in pre-processing the raw data to automatically detect and discard flat channels, remove 
 extraneous artifacts, and to band-pass filter the data in the range `1 - 80 Hz`. The six `1 min` long 
 data epochs were then down-sampled to ``200 Hz``. As the stimulus variable, we used the speech envelope reflecting 
 the momentary acoustic power, by averaging the auditory spectrogram representation (generated using a model of the 
