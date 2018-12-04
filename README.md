@@ -8,7 +8,7 @@ Bayesian optimization problem. Though the resulting  problem emerges as non-conv
 that leverage recent advances in evidence maximization. For more details please refer to the following resources:
 
 1. P. Das, C. Brodbeck, J. Z. Simon, B. Babadi, [Direct Cortical Localization of the MEG Auditory Temporal Response 
-Function: a Non-Convex Optimization Approach]( (https://isr.umd.edu/Labs/CSSL/simonlab/pubs/SFN2018.pdf)); Proceedings 
+Function: a Non-Convex Optimization Approach](https://isr.umd.edu/Labs/CSSL/simonlab/pubs/SFN2018.pdf); Proceedings 
 of the 47th Annual Neuroscience Meeting (SfN 2018), Nov. 2—7, San Diego, CA.
 2. P. Das, C. Brodbeck, J. Z. Simon, B. Babadi, [Cortical Localization of the Auditory Temporal Response Function from 
 MEG via Non-Convex Optimization](https://isr.umd.edu/Labs/CSSL/simonlab/pubs/Asilomar2018.pdf); 2018 Asilomar Conference
