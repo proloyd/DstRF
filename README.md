@@ -18,3 +18,6 @@ of the 47th Annual Neuroscience Meeting (SfN 2018), Nov. 2—7, San Diego, CA.
 MEG via Non-Convex Optimization](https://isr.umd.edu/Labs/CSSL/simonlab/pubs/Asilomar2018.pdf); 2018 Asilomar Conference
  on Signals, Systems, and Computers, Oct. 28–31, Pacific Grove, CA (invited)
  
+ 
+ ![Demo](https://user-images.githubusercontent.com/28169943/49410670-bf51c500-f733-11e8-9894-43880aa8d49e.gif)
+ 
