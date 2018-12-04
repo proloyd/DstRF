@@ -9,17 +9,20 @@ that leverage recent advances in evidence maximization. For more details please 
 
 1. P. Das, C. Brodbeck, J. Z. Simon, B. Babadi, [Direct Cortical Localization of the MEG Auditory Temporal Response 
 Function: a Non-Convex Optimization Approach](https://isr.umd.edu/Labs/CSSL/simonlab/pubs/SFN2018.pdf); Proceedings 
-of the 47th Annual Neuroscience Meeting (SfN 2018), Nov. 2—7, San Diego, CA.
+of the 47th Annual Neuroscience Meeting (SfN 2018), Nov. 2-7, San Diego, CA.
 2. P. Das, C. Brodbeck, J. Z. Simon, B. Babadi, [Cortical Localization of the Auditory Temporal Response Function from 
 MEG via Non-Convex Optimization](https://isr.umd.edu/Labs/CSSL/simonlab/pubs/Asilomar2018.pdf); 2018 Asilomar Conference
  on Signals, Systems, and Computers, Oct. 28–31, Pacific Grove, CA (invited)
  
+ This repository contains the implementation of our direct TRF estimation algorithm in python (version 3.6 and above). 
+  
+ 
  Reguirements:
  -----------
-Eelbrain ([Download/ Installation Instructions](https://eelbrain.readthedocs.io/en/r-0.28/index.html))
+Eelbrain ([Download/ Installation Instructions](https://eelbrain.readthedocs.io/en/latest/reference.html))
  
- Usage:
- -----
+ How to use use:
+ --------------
  1. Clone the repo and install using pip.
  3. Suppose we are interested in subject `XXXX`.
  2. Create forward source model using MNE-python. Convert it into NDVar format and save as a pickled file
@@ -38,25 +41,28 @@ Eelbrain ([Download/ Installation Instructions](https://eelbrain.readthedocs.io/
     `meg_l1.pickled`  
     `meg_l2.pickled`  
     Don't forget to put the empty room recordings `emptyroom.pickled` in the same folder.  
- 5. Change the ROOTDIR in config.py to the folder containing all these folders.
+5. Change the ROOTDIR in config.py to the folder containing all these folders.
  Also change the max # of iterations as suited. But default values should do just fine!
  
  6. Then from an ipython shell run the following commands:
 ```python
 form dstrf import load_subject
+subject_id = 'XXXX'
 model, data = load_subject(subject_id, n_splits, normalize=None)
 mu = 0.05 # needs to be chosen by cross-validation
 model.fit(data, mu, tol=1e-5, verbose=True)
-trf = model.get_strf(ds)
+trf = model.get_strf(data)
 ```
 That should take `~10 mins` to spit out cortical trf estimates.
+
+This is just a simple example of trf estimation. The package also contains individual fuctions, classes etc, so one can
+make custom functions according to his workflow needs.  
 
 Results
 -------
 We applied the algorithm on a subset of MEG data collected from 17 adults (aged 18-27 years) under an auditory task 
 described in the papers. In short, during the task, the participants listened to `1 min` long segments from 
-an audio-book recording of [The Legend of Sleepy Hollow by Washington Irving](https://librivox.org/the-legend-of-sleepy-hollow-by-washington-irving/) 
-, narrated by a male speaker. We consider localizing the TRFs using a total of `6 min` data from each participant. 
+an audio-book recording of [The Legend of Sleepy Hollow by Washington Irving](https://librivox.org/the-legend-of-sleepy-hollow-by-washington-irving/), narrated by a male speaker. We consider localizing the TRFs using a total of `6 min` data from each participant. 
 MNE-python 0.14 was used in pre-processing the raw data to automatically detect and discard flat channels, remove 
 extraneous artifacts, and to band-pass filter the data in the range `1 - 80 Hz`. The six `1 min` long 
 data epochs were then down-sampled to ``200 Hz``. As the stimulus variable, we used the speech envelope reflecting 
@@ -68,9 +74,10 @@ placing free orientation virtual dipoles on the resulting `3322` grid points. Th
  
  ![Demo](https://user-images.githubusercontent.com/28169943/49410670-bf51c500-f733-11e8-9894-43880aa8d49e.gif)
  
- If you realize you could use this method on your data, please feel free to use the codes. You can reach me at 
- proloy@umd.edu if you have any issues with the codes. And don't forget to go over the papers/ posters before applying \
- the algorithm. Note than, this is a dev version, I will be adding more functionality over time, so feel free to ask me 
+ Isn't that cool? Do expect to something like that with any other source localization method? If you realize you could 
+ use this method on your data, please feel free to use the codes. You can reach me at proloy@umd.edu if you have any 
+ issues with the codes. And don't forget to go over the papers/ posters before applying  the algorithm. Note that, 
+ this is a dev version, I will be adding more functionality over time, so feel free to ask me 
  to add any other functionality.
     
  Citation
