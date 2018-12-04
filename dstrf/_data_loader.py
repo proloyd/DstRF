@@ -1,5 +1,5 @@
 # Author: Proloy Das <proloy@umd.edu>
-import config as cfg
+from . import config as cfg
 
 import pickle
 import numpy as np
@@ -11,9 +11,7 @@ from ._model import DstRF, REG_Data
 
 
 def _myinv(x):
-    """
-
-    Computes inverse
+    """Computes inverse
 
     parameters
     ----------
@@ -108,7 +106,7 @@ def load_subject(subject_id, n_splits=1, normalize=None):
 
 
 def learn_model_for_subject(subject_id, mu, normalize='l1'):
-    "Loads the data and performs model fitting using given mu"
+    """Loads the data and performs model fitting using given mu"""
     R, ds = load_subject(subject_id, n_splits=1, normalize=normalize)
     R.fit(ds, mu, tol=1e-5, verbose=True)
     trf = R.get_strf(ds)
