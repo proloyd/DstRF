@@ -30,7 +30,6 @@ setup(
         'numpy',
         'scipy',
         'eelbrain',
-        'nilearn',
     ],
 
 

@@ -44,8 +44,7 @@ def gaussian_basis(nlevel, span):
 
 
 def g(x, mu):
-    """
-    vector l1-norm penalty
+    """vector l1-norm penalty
 
                         g(x) = mu * |x|_1
 
@@ -63,8 +62,7 @@ def g(x, mu):
 
 
 def proxg(x, mu, tau):
-    """
-    proximal operator for g(x):
+    """proximal operator for g(x):
 
             prox_{tau g}(x) = min mu * |z|_1 + 1/ (2 * tau) ||x-z|| ** 2
 
@@ -84,12 +82,12 @@ def proxg(x, mu, tau):
 
 
 def shrink(x, mu):
-    """
-    Soft theresholding function--
+    """Soft theresholding function
+
     proximal function for l1-norm:
 
-                    S_{tau}(x) = min  |z|_1 + 1/ (2 * mu) ||x-z|| ** 2
-                            x_i = sign(x_i) * max(|x_i| - mu, 0)
+        S_{tau}(x) = min  |z|_1 + 1/ (2 * mu) ||x-z|| ** 2
+                x_i = sign(x_i) * max(|x_i| - mu, 0)
 
     :param x: generic vector
             (N,M) 2D array
@@ -103,10 +101,9 @@ def shrink(x, mu):
 
 
 def g_group(x, mu):
-    """
-    group (l12) norm  penalty:
+    """group (l12) norm  penalty:
 
-                        gg(x) = \sum ||x_s_{i,t}||
+            gg(x) = \sum ||x_s_{i,t}||
 
     where s_{i,t} = {x_{j,t}: j = 1*dc:(i+1)*dc}, i \in {1,2,...,#sources}, t \in {1,2,...,M}
 
@@ -193,16 +190,14 @@ def covariate_from_stim(stim, M, normalize=False):
 
 
 def _myinv(x):
-    """
+    """Computes inverse
 
-    Computes inverse
-
-    parameters
+    Parameters
     ----------
     x: ndarray
     array of shape (dc, dc)
 
-    returns
+    Returns
     -------
     ndarray
     array of shape (dc, dc)
@@ -214,14 +209,14 @@ def _myinv(x):
 
 
 def _compute_gamma_i(z, x):
-    """
+    """ Comptes Gamma_i
 
-    Computes Gamma_i = Z**(-1/2) * ( Z**(1/2) X X' Z**(1/2)) ** (1/2) * Z**(-1/2)
-                   = V(E)**(-1/2)V' * ( V ((E)**(1/2)V' X X' V(E)**(1/2)) V')** (1/2) * V(E)**(-1/2)V'
-                   = V(E)**(-1/2)V' * ( V (UDU') V')** (1/2) * V(E)**(-1/2)V'
-                   = V (E)**(-1/2) U (D)**(1/2) U' (E)**(-1/2) V'
+    Gamma_i = Z**(-1/2) * ( Z**(1/2) X X' Z**(1/2)) ** (1/2) * Z**(-1/2)
+           = V(E)**(-1/2)V' * ( V ((E)**(1/2)V' X X' V(E)**(1/2)) V')** (1/2) * V(E)**(-1/2)V'
+           = V(E)**(-1/2)V' * ( V (UDU') V')** (1/2) * V(E)**(-1/2)V'
+           = V (E)**(-1/2) U (D)**(1/2) U' (E)**(-1/2) V'
 
-    parameters
+    Parameters
     ----------
     z: ndarray
         array of shape (dc, dc)
@@ -231,7 +226,7 @@ def _compute_gamma_i(z, x):
         array of shape (dc, dc)
         auxiliary variable, x_i
 
-    returns
+    Returns
     -------
     ndarray
     array of shape (dc, dc)
@@ -259,7 +254,7 @@ def _compute_gamma_ip(z, x, gamma):
                    = V(E)**(-1/2)V' * ( V (UDU') V')** (1/2) * V(E)**(-1/2)V'
                    = V (E)**(-1/2) U (D)**(1/2) U' (E)**(-1/2) V'
 
-    parameters
+    Parameters
     ----------
     z: ndarray
         array of shape (dc, dc)
@@ -302,18 +297,23 @@ class REG_Data:
         self.tstep = None
         self._norm_factor = None
 
-    def load(self, key, meg, stim, normalize_regresor=False, verbose=0):
+    def load(self, key, meg, stim, normalize_regresor=False):
         """method to load data into REG data instrince
 
         Parameters
         ----------
-
-        :param key:
-        :param meg:
-        :param stim:
-        :param normalize_regresor:
-        :param verbose:
-        :return:
+            key: string|tuple
+                dictionary key
+            meg: NDVar
+                meg data
+            stim: NDVar
+                stimulus/ regressor/ predictor variable
+            normalize_regresor: Boolean
+                if True normalizes the regressor/ predictor. Will suggest to normalize data
+                manually. This functionality is not fully working.
+        Returns
+        -------
+            data loaded instance of REG_Data
         """
         # check if time lengths are same or not
         # skip for now
@@ -362,10 +362,14 @@ class REG_Data:
         return 'Regression data'
 
     def timeslice(self, idx):
-        """
+        """gets a time slice (used for cross-validation
 
-        idx: kfold splits
-        :return:
+        Parameters
+        ----------
+            idx: kfold splits
+        Returns
+        -------
+            REG_Data instance
         """
         regdata_ = REG_Data(self.filter_length)
         regdata_.datakeys = self.datakeys
@@ -419,23 +423,8 @@ class DstRF:
         individual source covariance matrices
 
     sigma_b: dict of ndarray of shape (K, K)
-        inverse of data covariance under the model
+        data covariance under the model
 
-
-    est_data_covariance: ndarray
-        array of shape (K, K)
-        estimated data covariance under the model
-        returned only if verbose=1
-
-    emp_data_covariance: ndarray
-        array of shape (K, K)
-        empirical data covariance
-        returned only if verbose=1
-
-    inverse_kernel: ndarray
-        array of shape (K, K)
-        inverse imaging kernel
-        returned only if return_inverse_kernel=1
 
     """
     _n_predictor_variables = 1
@@ -577,7 +566,7 @@ class DstRF:
 
         for more on this method refer to the paper.
 
-        parameters
+        Parameters
         ----------
             data: REG_Data instance
                 meg data and the corresponding stimulus variables
@@ -649,7 +638,7 @@ class DstRF:
     def _construct_f(self, data,):
         """creates instances of objective function and its gradient to be passes to the FASTA algorithm
 
-        parameter
+        Parameters
         ---------
             data: RegData instance"""
         L = [linalg.cholesky(self.Sigma_b[key], lower=True) for key in self.keys]
@@ -685,7 +674,7 @@ class DstRF:
     def eval_obj(self, data):
         """evaluates objective function
 
-        parameter
+        Parameters
         ---------
             data: RegData instance
         """
@@ -701,7 +690,7 @@ class DstRF:
     def eval_cv(self, data):
         """evaluates whole cross-validation metric (used bu CV only)
 
-        parameter
+        Parameters
         ---------
             data: RegData instance
         """
@@ -717,7 +706,7 @@ class DstRF:
     def eval_cv1(self, data):
         """evaluates Theta cross-validation metric (used bu CV only)
 
-        parameter
+        Parameters
         ---------
             data: RegData instance
         """
@@ -734,13 +723,13 @@ class DstRF:
         """Returns the learned spatio-temporal response function as NDVar
 
 
-        parameter
+        Parameters
         ---------
             data: RegData instance
 
-        returns
+        Returns
         -------
-            NDVar
+            NDVar, TRFs
         """
         trf = self.theta.copy()
         if data._n_predictor_variables > 1:
@@ -789,9 +778,13 @@ class DstRF:
         Ref: Lim, Chinghway, and Bin Yu. "Estimation stability with cross-validation (ESCV)."
         Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
 
-        :param models: DstRfCv instances
-        list containing pseudo estimates
-        :return: ES_mu
+        Parameters:
+            models: DstRfCv instances
+
+        Returns
+        -------
+            float
+                estimation stability metric
         """
         Y = []
         for model in models:
