@@ -19,6 +19,6 @@ MEG via Non-Convex Optimization](https://isr.umd.edu/Labs/CSSL/simonlab/pubs/Asi
  on Signals, Systems, and Computers, Oct. 28–31, Pacific Grove, CA (invited)
  
  
-https://user-images.githubusercontent.com/28169943/49410670-bf51c500-f733-11e8-9894-43880aa8d49e.gif
+![Demo](https://user-images.githubusercontent.com/28169943/49410670-bf51c500-f733-11e8-9894-43880aa8d49e.gif)
 
     
