@@ -17,22 +17,22 @@ MEG via Non-Convex Optimization](https://isr.umd.edu/Labs/CSSL/simonlab/pubs/Asi
  This repository contains the implementation of our direct TRF estimation algorithm in python (version 3.6 and above). 
   
  
- Reguirements:
+ Requirements:
  -----------
 Eelbrain ([Download/ Installation Instructions](https://eelbrain.readthedocs.io/en/latest/reference.html))
  
- How to use use:
+ How to use:
  --------------
  1. Clone the repo and install using pip.
  3. Suppose we are interested in subject `XXXX`.
  2. Create forward source model using MNE-python. Convert it into NDVar format and save as a pickled file
  under `fwdsol` folder:  
   `XXXX-vol-7-fwd.pickled`
- 3. Create `predictors` folder containing pickled stimulus variables for different conditions in NDVar format:
+ 3. Create `predictors` folder containing pickled stimulus variables for different conditions in NDVar format.
  Suppose there are two conditions, then the file contains:   
     `stim_h.pickled`  
     `stim_l.pickled`
- 4. Create `meg_XXXX` folder containing pickled meg recordings in NDVar format:
+ 4. Create `meg_XXXX` folder containing pickled meg recordings in NDVar format.
  Suppose there are three repetitions for each conditions, then this folder contains:  
     `meg_h0.pickled`  
     `meg_h1.pickled`  
@@ -42,21 +42,21 @@ Eelbrain ([Download/ Installation Instructions](https://eelbrain.readthedocs.io/
     `meg_l2.pickled`  
     Don't forget to put the empty room recordings `emptyroom.pickled` in the same folder.  
 5. Change the ROOTDIR in config.py to the folder containing all these folders.
- Also change the max # of iterations as suited. But default values should do just fine!
+ Also change the max # of iterations as suited. But the default values should do just fine!
  
  6. Then from an ipython shell run the following commands:
 ```python
 form dstrf import load_subject
 subject_id = 'XXXX'
 model, data = load_subject(subject_id, n_splits, normalize=None)
-mu = 0.05 # needs to be chosen by cross-validation
+mu = 0.02  # needs to be chosen by cross-validation
 model.fit(data, mu, tol=1e-5, verbose=True)
 trf = model.get_strf(data)
 ```
 That should take `~10 mins` to spit out cortical trf estimates.
 
-This is just a simple example of trf estimation. The package also contains individual fuctions, classes etc, so one can
-make custom functions according to his workflow needs.  
+This is just a simple example of cortical TRF estimation. The package also contains many other functions, classes etc, so one can
+make custom functions according to his/ her workflow needs.  
 
 Results
 -------
@@ -74,14 +74,17 @@ placing free orientation virtual dipoles on the resulting `3322` grid points. Th
  
  ![Demo](https://user-images.githubusercontent.com/28169943/49410670-bf51c500-f733-11e8-9894-43880aa8d49e.gif)
  
- Isn't that cool? Do expect to something like that with any other source localization method? If you realize you could 
+ Isn't that cool? Do expect to see something like that with any other source localization method? If you realize you could 
  use this method on your data, please feel free to use the codes. You can reach me at proloy@umd.edu if you have any 
- issues with the codes. And don't forget to go over the papers/ posters before applying  the algorithm. Note that, 
- this is a dev version, I will be adding more functionality over time, so feel free to ask me 
- to add any other functionality.
+ issues with the codes. And don't forget to go over the papers/ posters before applying the algorithm. 
+ 
+ Note that, 
+ this is a dev version, and I will be adding more functionality over time, so feel free to ask me 
+ to add any other functionality, or report if anything si broken.
     
  Citation
  --------
- If you use this code for your publication, please cite my papers mentioned above.
+ This repo is open for anyone to use under Apache license. But if you use this code for your publication, I will
+ appreciate you if cite my papers mentioned above.
   
  
