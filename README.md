@@ -48,15 +48,22 @@ Eelbrain ([Download/ Installation Instructions](https://eelbrain.readthedocs.io/
 ```python
 form dstrf import load_subject
 subject_id = 'XXXX'
-model, data = load_subject(subject_id, n_splits, normalize=None)
+model, data = load_subject(subject_id, 1, normalize=None)
 mu = 0.02  # needs to be chosen by cross-validation
 model.fit(data, mu, tol=1e-5, verbose=True)
 trf = model.get_strf(data)
 ```
 That should take `~10 mins` to spit out cortical trf estimates.
 
-This is just a simple example of cortical TRF estimation. The package also contains many other functions, classes etc, so one can
-make custom functions according to his/ her workflow needs.  
+This is just a simple example of cortical TRF estimation. The package also contains many other functions, 
+classes etc, so one can make custom functions according to his/ her workflow needs. 
+Recently,
+cross-validation function is also added. So you can run 
+```python
+model.fit(data, do_crossvalidation=True, mus=[0.01, 0.02, 0.05, 0.1], nsplits=3, tol=1e-5, verbose=True)
+```
+to perform a 3-fold cross-validation and then construct the model with the regularization 
+weight among the given range that gives least generalization error.
 
 Results
 -------
