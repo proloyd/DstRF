@@ -29,15 +29,14 @@ def _myinv(x):
     return y
 
 
-def load_subject(subject_id, n_splits=1, normalize=None):
+def load_subject(subject_id, normalize=None):
     """Loads data for running DstRF
 
     Parameters
     ----------
         subject_id: str
             File names are identified from this variable
-        n_splits: int (Default 1)
-            Decides how many instances of DstRF object to return.
+
         normalize: 'l1' | None (default)
             Normalization method
     Returns
@@ -68,13 +67,7 @@ def load_subject(subject_id, n_splits=1, normalize=None):
     noise_cov = np.eye(er.shape[0])
 
     # INITIALIZE DstRF object
-    R = [
-        DstRF(lead_field, noise_cov, n_iter=cfg.n_iter, n_iterc=cfg.n_iterc, n_iterf=cfg.n_iterf)  # 20 for
-        # cross-validation
-        for _ in range(n_splits)
-    ]
-    if len(R) == 1:
-        R = R[0]
+    R = DstRF(lead_field, noise_cov, n_iter=cfg.n_iter, n_iterc=cfg.n_iterc, n_iterf=cfg.n_iterf)
 
     # PACK DATA
     ds = REG_Data()
@@ -104,13 +97,3 @@ def load_subject(subject_id, n_splits=1, normalize=None):
 
     return R, ds
 
-
-def learn_model_for_subject(subject_id, mu, normalize='l1'):
-    """Loads the data and performs model fitting using given mu"""
-    R, ds = load_subject(subject_id, n_splits=1, normalize=normalize)
-    R.fit(ds, mu, tol=1e-5, verbose=True)
-    trf = R.get_strf(ds)
-    with open(cfg.trf_file % subject_id, 'wb') as f:
-        pickle.dump(trf, f)
-
-    return

@@ -48,7 +48,7 @@ Eelbrain ([Download/ Installation Instructions](https://eelbrain.readthedocs.io/
 ```python
 form dstrf import load_subject
 subject_id = 'XXXX'
-model, data = load_subject(subject_id, 1, normalize=None)
+model, data = load_subject(subject_id, normalize=None)
 mu = 0.02  # needs to be chosen by cross-validation
 model.fit(data, mu, tol=1e-5, verbose=True)
 trf = model.get_strf(data)
