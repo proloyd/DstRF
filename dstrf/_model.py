@@ -502,9 +502,14 @@ class DstRF:
         data._precompute()
         return self
 
-    def _solve(self, data, theta, use_optimized=True, **kwargs):
+    def _solve(self, data, theta, **kwargs):
         """Champagne steps implementation
 
+        Implementation details can be found at:
+        D. P. Wipf, J. P. Owen, H. T. Attias, K. Sekihara, and S. S. Nagarajan,
+        “Robust Bayesian estimation of the location, orientation, and time course
+        of multiple correlated neural sources using MEG,” NeuroImage, vol. 49,
+        no. 1, pp. 641–655, 2010
         Parameters
         ----------
             data: REG_Data instance
@@ -523,8 +528,6 @@ class DstRF:
         idx = kwargs.get('idx', slice(None, None))
 
         n_iterc = kwargs.get('n_iterc', self.n_iterc)
-
-        use_optimized = kwargs.get('use_optimized', use_optimized)
 
         for meg, covariates, key in data:
             meg = meg[idx]
@@ -556,12 +559,9 @@ class DstRF:
                     if dc == 1:
                         gamma[i] = sqrt(np.dot(x, x.T)) / np.real(sqrt(z))
                     elif dc == 3:
-                        if use_optimized:
                             _compute_gamma_ip(z, x, gamma[i])
-                        else:
-                            gamma[i] = _compute_gamma_i(z, x)
                     else:
-                        NotImplementedError('%i x %i matrices are not implemented yet.' )
+                        NotImplementedError('%i x %i matrices are not implemented yet.')
 
                     # update sigma_b for next iteration
                     sigma_b += np.dot(self.lead_field[:, i * dc:(i + 1) * dc],
@@ -573,12 +573,14 @@ class DstRF:
         return self
 
     def fit(self, data, mu, do_crossvalidation=False, tol=1e-4, verbose=False, **kwargs):
-        """cTRF estimator
+        """cTRF estimator implementation
 
         Estimate both TRFs and source variance from the observed MEG data by solving
-        the Bayesian optimization problem mentioned in the paper.
-
-        for more on this method refer to the paper.
+        the Bayesian optimization problem mentioned in the paper:
+        P. Das, C. Brodbeck, J. Z. Simon, B. Babadi, Cortical Localization of the
+        Auditory Temporal Response Function from MEG via Non-Convex Optimization;
+        2018 Asilomar Conference on Signals, Systems, and Computers, Oct. 28–31,
+        Pacific Grove, CA(invited).
 
         Parameters
         ----------
@@ -809,10 +811,10 @@ class DstRF:
 
     @staticmethod
     def compute_ES_metric(models, data):
-        """
-        Estimation Stability matric
+        """Computes estimation stability metric
 
-        Ref: Lim, Chinghway, and Bin Yu. "Estimation stability with cross-validation (ESCV)."
+        Details can be found at:
+        Lim, Chinghway, and Bin Yu. "Estimation stability with cross-validation (ESCV)."
         Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
 
         Parameters:
@@ -836,7 +838,7 @@ class DstRF:
         return VarY / (Y_bar ** 2).sum()
 
     def _get_cvfunc(self, data, n_splits):
-        """method for creating function for crossvalidation
+        """Method for creating function for crossvalidation
 
         In the cross-validation phase the workers will call this function for
         for different regularizer parameters.
