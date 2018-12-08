@@ -57,6 +57,7 @@ That should take `~10 mins` to spit out cortical trf estimates.
 
 This is just a simple example of cortical TRF estimation. The package also contains many other functions, 
 classes etc, so one can make custom functions according to his/ her workflow needs. 
+
 Recently,
 cross-validation function is also added. So you can run 
 ```python
