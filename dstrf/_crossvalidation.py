@@ -51,21 +51,21 @@ def crossvalidate(model, data, mus=None, n_splits=None, n_workers=None):
 
     Parameters
     ----------
-    model: object
-        the model to be validated, here DstRF. In addition to that it needs to
-        support `copy.copy` function. 
-    data: object
-        the instance should be compatible for fitting the model. In addition to 
-        that it shall have a timeslice method compatible to kfold objects.
-    mus: list | ndarray  (floats)
-        The range of the regularizing weights. If None, it will use values
-        specified in config.py.
-    n_splits: int
-        number of folds for cross-validation, If None, it will use values
-        specified in config.py.
-    n_workers: int
-        number of workers to be used. If None, it will use values specified
-        in config.py.
+        model: object
+            the model to be validated, here DstRF. In addition to that it needs to
+            support `copy.copy` function.
+        data: object
+            the instance should be compatible for fitting the model. In addition to
+            that it shall have a timeslice method compatible to kfold objects.
+        mus: list | ndarray  (floats)
+            The range of the regularizing weights. If None, it will use values
+            specified in config.py.
+        n_splits: int
+            number of folds for cross-validation, If None, it will use values
+            specified in config.py.
+        n_workers: int
+            number of workers to be used. If None, it will use values specified
+            in config.py.
 
     Results
     -------

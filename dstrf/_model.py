@@ -586,10 +586,14 @@ class DstRF:
                 meg data and the corresponding stimulus variables
 
             mu: float
-                regularization parameter,  promote temporal sparsity and provide gurad against
-                overfitting
+                regularization parameter,  promote temporal sparsity and provide guard against
+                over-fitting
 
             do_crossvalidation: bool
+                if True, from a wide range of regularizing parameters, the one resulting in
+                the least generalization error in a k-fold cross-validation procedure is chosen.
+                Unless specified the range and k is chosed from cofig.py. The user can also pass
+                several keyword arguments to overwrite them.
 
             tol: float (1e-4 Default)
                 tolerence parameter. Decides when to stop outer iterations.
@@ -597,6 +601,15 @@ class DstRF:
             verbose: Boolean
                 If set True prints intermediate values of the cost functions.
                 by Default it is set to be False
+
+            mus: list | ndarray
+                range of mu to be considered for cross-validation
+
+            n_splits: int
+                k value used in k-fold cross-validation
+
+            n_workers: int
+                number of workers to be used for cross-validation
         """
         # take care of cross-validation
         if do_crossvalidation:
