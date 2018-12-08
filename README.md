@@ -61,7 +61,7 @@ classes etc, so one can make custom functions according to his/ her workflow nee
 Recently,
 cross-validation function is also added. So you can run 
 ```python
-model.fit(data, do_crossvalidation=True, mus=[0.01, 0.02, 0.05, 0.1], nsplits=3, tol=1e-5, verbose=True)
+model.fit(data, do_crossvalidation=True, mus=[0.01, 0.02, 0.05, 0.1], n_splits=3, tol=1e-5, verbose=True)
 ```
 to perform a 3-fold cross-validation and then construct the model with the regularization 
 weight among the given range that gives least generalization error.
