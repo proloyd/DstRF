@@ -1,14 +1,18 @@
 # Author: Proloy Das <proloy@umd.edu>
-import numpy as np
-from scipy import linalg
-from eelbrain import *
-from math import sqrt
 import time
+import copy
+import numpy as np
 
 # Some specialized functions
 from numpy.core.umath_tests import inner1d
+from scipy import linalg
+from math import sqrt
+
+# eelbrain imports
+from eelbrain import UTS, NDVar, combine, Case
 
 from ._fastac import Fasta
+from ._crossvalidation import crossvalidate
 from . import opt
 from .dsyevh3C import compute_gamma_c
 
@@ -45,7 +49,6 @@ def gaussian_basis(nlevel, span):
 
 def g(x, mu):
     """vector l1-norm penalty
-
                         g(x) = mu * |x|_1
 
     :param x : strf corresponding to one trial
@@ -63,7 +66,6 @@ def g(x, mu):
 
 def proxg(x, mu, tau):
     """proximal operator for g(x):
-
             prox_{tau g}(x) = min mu * |z|_1 + 1/ (2 * tau) ||x-z|| ** 2
 
     :param x : strf corresponding to one trial,
@@ -85,7 +87,6 @@ def shrink(x, mu):
     """Soft theresholding function
 
     proximal function for l1-norm:
-
         S_{tau}(x) = min  |z|_1 + 1/ (2 * mu) ||x-z|| ** 2
                 x_i = sign(x_i) * max(|x_i| - mu, 0)
 
@@ -344,6 +345,7 @@ class REG_Data:
         return self
 
     def _precompute(self):
+        """Called by DstRF instance"""
         self._bbt = []
         self._bE = []
         self._EtE = []
@@ -385,8 +387,7 @@ class REG_Data:
 
 
 class DstRF:
-    """
-    Direct estimation of TRFs over the source space
+    """Direct estimation of TRFs over the source space
 
 
     Parameters
@@ -424,10 +425,11 @@ class DstRF:
 
     sigma_b: dict of ndarray of shape (K, K)
         data covariance under the model
-
-
     """
+    _name = 'cTRFs estimator'
     _n_predictor_variables = 1
+    _cv_info = None
+    _crossvalidated = False
 
     def __init__(self, lead_field, noise_covariance, n_iter=30, n_iterc=10, n_iterf=100):
         if lead_field.has_dim('space'):
@@ -440,6 +442,7 @@ class DstRF:
             self.lead_field = lead_field.get_data(dims=('sensor', 'source')).astype(np.float64)
             self.sources_n = self.lead_field.shape[1]
             self.orientation = 'fixed'
+            self.space = None
 
         self.lead_field_scaling = linalg.norm(self.lead_field, 2)
         self.lead_field /= self.lead_field_scaling
@@ -451,11 +454,11 @@ class DstRF:
         self.n_iterc = n_iterc
         self.n_iterf = n_iterf
 
-        self.__init__vars()
+        self._init_vars()
         self._init_Sigma_b = None
         self._init_Gamma = None
 
-    def __init__vars(self):
+    def _init_vars(self):
         wf = linalg.cholesky(self.noise_covariance, lower=True)
         Gtilde = linalg.solve(wf, self.lead_field)
         self.eta = (self.lead_field.shape[0] / np.trace(np.dot(Gtilde, Gtilde.T)))
@@ -464,7 +467,20 @@ class DstRF:
         self.init_sigma_b = sigma_b
         return self
 
-    def __init__iter(self, data):
+    def __repr__(self):
+        out = "<[%s orientation] %s on %r>" % (self.orientation, self._name, self.source)
+        return out
+
+    def __copy__(self):
+        obj = type(self).__new__(self.__class__)
+        copy_keys = ['lead_field', 'sources_n', 'orientation', 'space', 'lead_field_scaling', 'source', 'sensor',
+                     'noise_covariance', 'n_iter', 'n_iterc', 'n_iterf', 'eta', 'init_sigma_b', '_init_Sigma_b',
+                     '_init_Gamma']
+        for key in copy_keys:
+            obj.__dict__.update({key: self.__dict__.get(key, None)})
+        return obj
+
+    def _init_iter(self, data):
         dc = orientation[self.orientation]
         self.Gamma = {}
         self.Sigma_b = {}
@@ -482,7 +498,7 @@ class DstRF:
 
     def _set_mu(self, mu, data):
         self.mu = mu
-        self.__init__iter(data)
+        self._init_iter(data)
         data._precompute()
         return self
 
@@ -531,19 +547,15 @@ class DstRF:
 
                 for i in range(self.sources_n):
                     # update Xi
-                    # x = np.dot(gamma[i], np.dot(yhat.T, lhat[:, i * dc:(i + 1) * dc]).T)
                     x = np.dot(gamma[i], np.dot(ytilde.T, lhat[:, i * dc:(i + 1) * dc]).T)
 
                     # update Zi
-                    # z = np.dot(self.lead_field[:, i * dc:(i + 1) * dc].T, lhat[:, i * dc:(i + 1) * dc])
                     z = np.dot(lhat[:, i * dc:(i + 1) * dc].T, lhat[:, i * dc:(i + 1) * dc])
 
                     # update Ti
                     if dc == 1:
                         gamma[i] = sqrt(np.dot(x, x.T)) / np.real(sqrt(z))
                     elif dc == 3:
-                        # import ipdb
-                        # ipdb.set_trace()
                         if use_optimized:
                             _compute_gamma_ip(z, x, gamma[i])
                         else:
@@ -560,8 +572,10 @@ class DstRF:
 
         return self
 
-    def fit(self, data, mu, tol=1e-4, verbose=False, **kwargs):
-        """ estimate both TRFs and source variance from the observed MEG data by solving
+    def fit(self, data, mu, do_crossvalidation=False, tol=1e-4, verbose=False, **kwargs):
+        """cTRF estimator
+
+        Estimate both TRFs and source variance from the observed MEG data by solving
         the Bayesian optimization problem mentioned in the paper.
 
         for more on this method refer to the paper.
@@ -575,6 +589,8 @@ class DstRF:
                 regularization parameter,  promote temporal sparsity and provide gurad against
                 overfitting
 
+            do_crossvalidation: bool
+
             tol: float (1e-4 Default)
                 tolerence parameter. Decides when to stop outer iterations.
 
@@ -582,9 +598,17 @@ class DstRF:
                 If set True prints intermediate values of the cost functions.
                 by Default it is set to be False
         """
-        idx = kwargs.get('idx', None)
-        if idx is not None:
-            data = data.timeslice(idx)
+        # take care of cross-validation
+        if do_crossvalidation:
+            mus = kwargs.get('mus', None)
+            n_splits = kwargs.get('n_splits', None)
+            n_workers = kwargs.get('n_workers', None)
+            mu, cv_info = crossvalidate(self, data, mus, n_splits, n_workers)
+            self._cv_info = cv_info
+            self._crossvalidated = True
+        else:
+            pass
+            # use the passed mu
 
         self._set_mu(mu, data)
 
@@ -607,7 +631,7 @@ class DstRF:
         for i in (range(self.n_iter)):
             if verbose:
                 print('iteration: %i:' % i)
-            funct, grad_funct = self._construct_f(data, **kwargs)
+            funct, grad_funct = self._construct_f(data)
             Theta = Fasta(funct, g_funct, grad_funct, prox_g, n_iter=self.n_iterf)
             Theta.learn(theta)
             # ipdb.set_trace()
@@ -688,7 +712,7 @@ class DstRF:
         return v / len(data)
 
     def eval_cv(self, data):
-        """evaluates whole cross-validation metric (used bu CV only)
+        """evaluates whole cross-validation metric (used by CV only)
 
         Parameters
         ---------
@@ -704,7 +728,7 @@ class DstRF:
         return v / len(data)
 
     def eval_cv1(self, data):
-        """evaluates Theta cross-validation metric (used bu CV only)
+        """evaluates Theta cross-validation metric (used by CV only)
 
         Parameters
         ---------
@@ -737,7 +761,6 @@ class DstRF:
             trf.shape = shape
             trf = trf.swapaxes(1, 0)
 
-        # trf = np.dot(self.basis, self.theta.T).T
         trf = np.dot(trf, data.basis.T)
 
         time = UTS(0, data.tstep, trf.shape[-1])
@@ -763,12 +786,13 @@ class DstRF:
 
     @staticmethod
     def _residual(theta0, theta1):
-        # import pdb
-        # pdb.set_trace()
         diff = theta1 - theta0
         num = diff ** 2
         den = theta0 ** 2
-        return sqrt(num.sum() / den.sum())
+        if den.sum() <= 0:
+            return np.inf
+        else:
+            return sqrt(num.sum() / den.sum())
 
     @staticmethod
     def compute_ES_metric(models, data):
@@ -779,7 +803,7 @@ class DstRF:
         Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
 
         Parameters:
-            models: DstRfCv instances
+            models: DstRf instances
 
         Returns
         -------
@@ -797,3 +821,55 @@ class DstRF:
         VarY = (((Y - Y_bar) ** 2).sum(axis=1)).mean()
 
         return VarY / (Y_bar ** 2).sum()
+
+    def _get_cvfunc(self, data, n_splits):
+        """method for creating function for crossvalidation
+
+        In the cross-validation phase the workers will call this function for
+        for different regularizer parameters.
+
+        Parameters
+        ----------
+        data:  object
+            the instance should be compatible for fitting the model. In addition to
+            that it shall have a timeslice method compatible to kfold objects.
+
+        n_splits: int
+            number of folds for cross-validation, If None, it will use values
+            specified in config.py.
+
+        Returns
+        -------
+            callable, return the cross-validation metrics
+        """
+        models_ = [copy.copy(self) for _ in range(n_splits)]
+        from sklearn.model_selection import KFold
+
+        def cvfunc(mu):
+            kf = KFold(n_splits=n_splits)
+            ll = []
+            ll1 = []
+            ll2 = []
+            thetas = []
+            for model_, (train, test) in zip(models_, kf.split(data.meg[data.datakeys[0]][0, :])):
+                traindata = data.timeslice(train)
+                testdata = data.timeslice(test)
+                model_.fit(traindata, mu, tol=1e-5, verbose=False)
+                ll.append(model_.eval_cv(testdata))
+                ll1.append(model_.eval_obj(testdata))
+                ll2.append(model_.eval_cv1(testdata))
+                thetas.append(model_.get_strf(data))
+
+            time.sleep(0.001)
+            # val1 = np.array(ll).mean()
+            val1 = sum(ll) / len(ll)
+
+            val2 = self.compute_ES_metric(models_, data)
+
+            val3 = sum(ll1) / len(ll1)
+
+            val4 = sum(ll2) / len(ll2)
+
+            return {'cv': val1, 'es': val2, 'cv1': val3, 'cv2': val4}
+
+        return cvfunc

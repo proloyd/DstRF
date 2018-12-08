@@ -21,6 +21,7 @@ predictor_file = join(ROOTDIR, predictor_template)
 fwdsol_file = join(ROOTDIR, fwdsol_template)
 emptyroom_file = join(ROOTDIR, emptyroom_template)
 
+
 # Cut-off frequencies for band-pass filter
 l_freq = 1
 h_freq = 80
@@ -30,6 +31,13 @@ sampling_freq = 200
 n_iter = 10
 n_iterc = 10
 n_iterf = 100
+
+# Cross validation params
+normalize = 'l1'
+mus = linspace(10, 100, 10) * 1e-4
+n_splits = 3
+n_workers = 4
+
 
 
 
