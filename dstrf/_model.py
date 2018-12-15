@@ -181,10 +181,8 @@ def covariate_from_stim(stim, M, normalize=False):
     Y = []
     for j in range(w.shape[0]):
         X = []
-        i = 0
-        while i + M <= length:
+        for i in range(length - M + 1):
             X.append(np.flipud(w[j, i:i + M]))
-            i += 1
         Y.append(np.array(X))
 
     return np.array(Y)
@@ -288,17 +286,21 @@ class REG_Data:
     """
     _n_predictor_variables = 1
 
-    def __init__(self, filter_length=200):
-        self.filter_length = filter_length
-        x = np.linspace(5, 1000, self.filter_length)
-        self.basis = gaussian_basis(self.filter_length, x)
-        self.covariates = dict()
-        self.meg = dict()
-        self.datakeys = []
+    def __init__(self, tstart, tstop):
+        if tstart != 0:
+            raise NotImplementedError("tstart != 0 is not implemented")
+        self.tstart = tstart
+        self.tstop = tstop
+        self.meg = []
+        self.covariates = []
         self.tstep = None
+        self.filter_length = None
+        self.basis = None
         self._norm_factor = None
+        self._stim_sequence = None
+        self._stim_dims = None
 
-    def load(self, key, meg, stim, normalize_regresor=False):
+    def add_data(self, meg, stim, normalize_regresor=False):
         """method to load data into REG data instrince
 
         Parameters
@@ -316,18 +318,59 @@ class REG_Data:
         -------
             data loaded instance of REG_Data
         """
-        # check if time lengths are same or not
-        # skip for now
-
-        self.datakeys.append(key)
-
+        meg_time = meg.get_dim('time')
         if self.tstep is None:
-            self.tstep = meg.time.tstep
+            # initialize time axis
+            self.tstep = meg_time.tstep
+            start = int(round(self.tstart / self.tstep))
+            stop = int(round(self.tstop / self.tstep))
+            self.filter_length = stop - start
+            # basis
+            x = np.linspace(5, 1000, self.filter_length)
+            self.basis = gaussian_basis(self.filter_length, x)
+            # stimuli
+            if isinstance(stim, NDVar):
+                self._stim_sequence = False
+                stims = [stim]
+            elif not isinstance(stim, (list, tuple)):
+                raise TypeError(f"stim={stim!r}")
+            else:
+                stims = stim
+                self._stim_sequence = True
+            stim_dims = []
+            for x in stims:
+                if x.ndim == 1:
+                    stim_dims.append(())
+                elif x.ndim == 2:
+                    dim, _ = x.get_dims((None, 'time'))
+                else:
+                    raise ValueError(f"stim={stim}: stimulus with more than 2 dimensions")
+            self._stim_dims = tuple(stim_dims)
+        elif meg_time.tstep != self.tstep:
+            raise ValueError(f"meg={meg!r}: incompatible time-step with previously added data")
+        else:
+            stims = stim if self._stim_sequence else [stim]
+            # check stimuli dimensions
+            if len(stims) != len(self._stim_dims):
+                raise ValueError(f"stim={stim!r}: different number of stimuli from previously added data")
+            for dim, x in zip(self._stim_dims, stims):
+                if dim is None:
+                    assert x.dimnames == ('time',)
+                else:
+                    x_dim, _ = x.get_dims((None, 'time'))
+                    if x_dim != dim:
+                        raise ValueError(f"stim={stim!r}: dimension {dim} incompatible with previously added data")
+
+
+        # check stimuli time axis
+        for x in stims:
+            if x.get_dim('time') != meg_time:
+                raise ValueError(f"stim={stim!r}: time axis incompatible with meg")
 
         # add meg data
         y = meg.get_data(('sensor', 'time'))
         y = y[:, self.basis.shape[0]-1:].astype(np.float64)
-        self.meg[key] = y / sqrt(y.shape[1])  # Mind the normalization
+        self.meg.append(y / sqrt(y.shape[1]))  # Mind the normalization
 
         if self._norm_factor is None:
             self._norm_factor = sqrt(y.shape[1])
@@ -340,7 +383,8 @@ class REG_Data:
             covariates = covariates.swapaxes(1, 0)
 
         first_dim = covariates.shape[0]
-        self.covariates[key] = covariates.reshape(first_dim, -1).astype(np.float64)
+        x = covariates.reshape(first_dim, -1).astype(np.float64)
+        self.covariates.append(x)
 
         return self
 
@@ -355,10 +399,10 @@ class REG_Data:
             self._EtE.append(np.dot(E.T, E))
 
     def __iter__(self):
-        return ((self.meg[key], self.covariates[key], key) for key in self.datakeys)
+        return zip(self.meg, self.covariates)
 
     def __len__(self):
-        return len(self.datakeys)
+        return len(self.meg)
 
     def __repr__(self):
         return 'Regression data'
@@ -389,31 +433,26 @@ class REG_Data:
 class DstRF:
     """Direct estimation of TRFs over the source space
 
-
     Parameters
     ----------
     lead_field: NDVar
         array of shape (K, N)
         lead-field matrix.
         both fixed or free orientation lead-field vectors can be used.
-
-    orientation: 'fixed'|'free'
-        'fixed': orientation-constrained lead-field matrix.
-        'free': free orientation lead-field matrix.
-
     noise_covariance: ndarray
         array of shape (K, K)
         noise covariance matrix
         use empty-room recordings to generate noise covariance matrix at sensor space.
-
+    tstart : float
+        Start of the TRF in seconds (default 0).
+    tstop : float
+        Stop of the TRF in seconds (default 0.5).
     n_iter: int, optionnal
         number of iterations
         default is 30
-
     n_iterc: int, optionnal
         number of inner champagne iterations
-        default is 100
-
+        default is 10
     n_iterf: int, optionnal
         number of inner FASTA iterations
         default is 100
@@ -422,27 +461,40 @@ class DstRF:
     ----------
     Gamma: dict of lists
         individual source covariance matrices
-
     sigma_b: dict of ndarray of shape (K, K)
         data covariance under the model
+
+    Notes
+    -----
+    Usage:
+
+        1. Initialize :class:`DstRF` instance with desired properties
+        2. Call :meth:`DstRF.add_data` once for each contiguous segment of MEG
+           data
+        3. Call :meth:`DstRF.fit` to estimate the cortical TRFs.
     """
     _name = 'cTRFs estimator'
     _n_predictor_variables = 1
     _cv_info = None
     _crossvalidated = False
 
-    def __init__(self, lead_field, noise_covariance, n_iter=30, n_iterc=10, n_iterf=100):
+    def __init__(self, lead_field, noise_covariance, tstart=0., tstop=0.5, n_iter=30, n_iterc=10, n_iterf=100):
+        # pre-whitening
+        e, v = linalg.eigh(noise_covariance)
+        wf = np.dot(v * _myinv(np.sqrt(e)), v.T.conj())
+
         if lead_field.has_dim('space'):
-            self.lead_field = lead_field.get_data(dims=('sensor', 'source', 'space')).astype(np.float64)
-            self.sources_n = self.lead_field.shape[1]
-            self.lead_field = self.lead_field.reshape(self.lead_field.shape[0], -1)
+            g = lead_field.get_data(dims=('sensor', 'source', 'space')).astype(np.float64)
+            g = np.tensordot(wf, g, 1)
+            self.lead_field = g.reshape(g.shape[0], -1)
             self.orientation = 'free'
             self.space = lead_field.space
         else:
-            self.lead_field = lead_field.get_data(dims=('sensor', 'source')).astype(np.float64)
-            self.sources_n = self.lead_field.shape[1]
+            g = lead_field.get_data(dims=('sensor', 'source')).astype(np.float64)
+            self.lead_field = np.dot(wf, g)
             self.orientation = 'fixed'
             self.space = None
+        self.sources_n = self.lead_field.shape[1]
 
         self.lead_field_scaling = linalg.norm(self.lead_field, 2)
         self.lead_field /= self.lead_field_scaling
@@ -457,6 +509,7 @@ class DstRF:
         self._init_vars()
         self._init_Sigma_b = None
         self._init_Gamma = None
+        self._data = REG_Data(tstart, tstop)
 
     def _init_vars(self):
         wf = linalg.cholesky(self.noise_covariance, lower=True)
@@ -465,7 +518,6 @@ class DstRF:
         # model data covariance
         sigma_b = self.noise_covariance + self.eta * np.dot(self.lead_field, self.lead_field.T)
         self.init_sigma_b = sigma_b
-        return self
 
     def __repr__(self):
         out = "<[%s orientation] %s on %r>" % (self.orientation, self._name, self.source)
@@ -479,6 +531,20 @@ class DstRF:
         for key in copy_keys:
             obj.__dict__.update({key: self.__dict__.get(key, None)})
         return obj
+
+    def add_data(self, meg, stim):
+        """Add sensor measurements and predictor variables for one trial
+
+        Call this function repeatedly to add data for multiple trials/recordings
+
+        Parameters
+        ----------
+        meg : NDVar  (sensor, UTS)
+            MEG Measurements.
+        stim: list of NDVar  ([...,] UTS)
+            One or more predictor variable. The time axis needs to match ``y``.
+        """
+        self._data.add_data(meg, stim)
 
     def _init_iter(self, data):
         dc = orientation[self.orientation]
@@ -584,34 +650,27 @@ class DstRF:
 
         Parameters
         ----------
-            data: REG_Data instance
-                meg data and the corresponding stimulus variables
-
-            mu: float
-                regularization parameter,  promote temporal sparsity and provide guard against
-                over-fitting
-
-            do_crossvalidation: bool
-                if True, from a wide range of regularizing parameters, the one resulting in
-                the least generalization error in a k-fold cross-validation procedure is chosen.
-                Unless specified the range and k is chosed from cofig.py. The user can also pass
-                several keyword arguments to overwrite them.
-
-            tol: float (1e-4 Default)
-                tolerence parameter. Decides when to stop outer iterations.
-
-            verbose: Boolean
-                If set True prints intermediate values of the cost functions.
-                by Default it is set to be False
-
-            mus: list | ndarray
-                range of mu to be considered for cross-validation
-
-            n_splits: int
-                k value used in k-fold cross-validation
-
-            n_workers: int
-                number of workers to be used for cross-validation
+        data: REG_Data instance
+            meg data and the corresponding stimulus variables
+        mu: float
+            regularization parameter,  promote temporal sparsity and provide guard against
+            over-fitting
+        do_crossvalidation: bool
+            if True, from a wide range of regularizing parameters, the one resulting in
+            the least generalization error in a k-fold cross-validation procedure is chosen.
+            Unless specified the range and k is chosed from cofig.py. The user can also pass
+            several keyword arguments to overwrite them.
+        tol: float (1e-4 Default)
+            tolerence parameter. Decides when to stop outer iterations.
+        verbose: Boolean
+            If set True prints intermediate values of the cost functions.
+            by Default it is set to be False
+        mus: list | ndarray
+            range of mu to be considered for cross-validation
+        n_splits: int
+            k value used in k-fold cross-validation
+        n_workers: int
+            number of workers to be used for cross-validation
         """
         # take care of cross-validation
         if do_crossvalidation:

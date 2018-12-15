@@ -3,7 +3,7 @@ from . import config as cfg
 
 import pickle
 import numpy as np
-from scipy import io, linalg
+from scipy import linalg
 
 from eelbrain import *
 
