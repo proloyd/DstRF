@@ -41,7 +41,7 @@ def mp_worker(fun, shared_job_q, shared_result_q, nprocs):
     shared_result_q.put(None)
 
 
-def crossvalidate(model, data, mus=None, n_splits=None, n_workers=None):
+def crossvalidate(model, mus=None, n_splits=None, n_workers=None):
     """used to perform cross-validation of cTRF model
 
     This function assumes `model` class has method _get_cvfunc(data, n_splits)
@@ -54,9 +54,6 @@ def crossvalidate(model, data, mus=None, n_splits=None, n_workers=None):
         model: object
             the model to be validated, here DstRF. In addition to that it needs to
             support `copy.copy` function.
-        data: object
-            the instance should be compatible for fitting the model. In addition to
-            that it shall have a timeslice method compatible to kfold objects.
         mus: list | ndarray  (floats)
             The range of the regularizing weights. If None, it will use values
             specified in config.py.
