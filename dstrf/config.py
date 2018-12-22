@@ -29,7 +29,7 @@ sampling_freq = 200
 
 # max # of iterations
 n_iter = 10
-n_iterc = 10
+n_iterc = 30
 n_iterf = 100
 
 # Cross validation params

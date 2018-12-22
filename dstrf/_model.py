@@ -17,30 +17,27 @@ from . import opt
 from .dsyevh3C import compute_gamma_c
 
 
-orientation = {'fixed': 1, 'free': 3}
-
-
 def gaussian_basis(nlevel, span):
     """Construct Gabor basis for the TRFs.
 
     Parameters
     ----------
-        nlevel: int
-            number of atoms
-        span: ndarray
-            the span to cover by the atoms
+    nlevel: int
+        number of atoms
+    span: ndarray
+        the span to cover by the atoms
 
     Returns
     -------
-    Gabor atoms
+        ndarray (Gabor atoms)
     """
     x = span
     means = np.linspace(x[-1] / nlevel, x[-1] * (1 - 1 / nlevel), num=nlevel - 1)
     stds = 8.5
     W = []
 
-    for count in list(range(nlevel - 1)):
-        W.append(np.exp(-(x - means[count]) ** 2 / (2 * stds ** 2)))
+    for mean in means:
+        W.append(np.exp(-(x - mean) ** 2 / (2 * stds ** 2)))
 
     W = np.array(W)
 
@@ -48,56 +45,17 @@ def gaussian_basis(nlevel, span):
 
 
 def g(x, mu):
-    """vector l1-norm penalty
-                        g(x) = mu * |x|_1
-
-    :param x : strf corresponding to one trial
-            (N,M) 2D array
-            Note: the norm is taken after flattening the matrix
-    :param mu: regularizing parameter
-            scalar float
-
-    :return: g(x)
-            scalar float
-
-    """
+    """vector l1-norm penalty"""
     return mu * np.sum(np.abs(x))
 
 
 def proxg(x, mu, tau):
-    """proximal operator for g(x):
-            prox_{tau g}(x) = min mu * |z|_1 + 1/ (2 * tau) ||x-z|| ** 2
-
-    :param x : strf corresponding to one trial,
-            (N,M) 2D array
-            Note: the norm is taken after flattening the matrix
-    :param mu: regularizing parameter
-            scalar float
-    :param tau: step size for fasta iterations
-            scalar float
-
-    :return: prox_{tau g}(x)
-            (N,M) 2D array
-    """
-
+    """proximal operator for l1-norm penalty"""
     return shrink(x, mu * tau)
 
 
 def shrink(x, mu):
-    """Soft theresholding function
-
-    proximal function for l1-norm:
-        S_{tau}(x) = min  |z|_1 + 1/ (2 * mu) ||x-z|| ** 2
-                x_i = sign(x_i) * max(|x_i| - mu, 0)
-
-    :param x: generic vector
-            (N,M) 2D array
-    :param mu: backward step-size parameter
-            scalar float
-
-    :return: S_{tau}(x)
-            (N,M) 2D array
-    """
+    """Soft theresholding function"""
     return np.multiply(np.sign(x), np.maximum(np.abs(x) - mu, 0))
 
 
@@ -107,14 +65,6 @@ def g_group(x, mu):
             gg(x) = \sum ||x_s_{i,t}||
 
     where s_{i,t} = {x_{j,t}: j = 1*dc:(i+1)*dc}, i \in {1,2,...,#sources}, t \in {1,2,...,M}
-
-    :param x : strf corresponding to one trial,
-            (N,M) 2D array
-    :param mu: regularizing parameter
-            scalar float
-
-    :return group norm gg(x)
-            scalar float
     """
     l = x.shape[1]
     x.shape = (-1, 3, l)
@@ -130,13 +80,6 @@ def proxg_group_opt(z, mu):
                     x_s = max(1 - mu/||z_s||, 0) z_s
 
     Note: It does update the supplied z. It is a wrapper for distributed Cython code.
-    :param x : strf corresponding to one trial,
-            (N,M) 2D array
-    :param mu: regularizing parameter
-            scalar float
-
-    :return prox_{mu gg}(x)
-            (N,M) 2D array
     """
     # x = z.view()
     l = z.shape[1]
@@ -151,20 +94,16 @@ def covariate_from_stim(stim, M, normalize=False):
 
     parameters
     ----------
-    stim: ndvar
-        array of shape (1, T)
+    stim: NDVar
         predictor variables
-
     M: int
         order of filter
-
     normalize: bool, optional
         indicates if the stimulus to be normalized
 
     returns
     -------
-    covariate matrix: ndarray
-
+        ndarray (covariate matrix)
     """
     if stim.has_case:
         w = stim.get_data(('case', 'time'))
@@ -189,18 +128,7 @@ def covariate_from_stim(stim, M, normalize=False):
 
 
 def _myinv(x):
-    """Computes inverse
-
-    Parameters
-    ----------
-    x: ndarray
-    array of shape (dc, dc)
-
-    Returns
-    -------
-    ndarray
-    array of shape (dc, dc)
-    """
+    """Computes inverse"""
     x = np.real(np.array(x))
     y = np.zeros(x.shape)
     y[x > 0] = 1 / x[x > 0]
@@ -218,18 +146,13 @@ def _compute_gamma_i(z, x):
     Parameters
     ----------
     z: ndarray
-        array of shape (dc, dc)
         auxiliary variable,  z_i
-
     x: ndarray
-        array of shape (dc, dc)
         auxiliary variable, x_i
 
     Returns
     -------
-    ndarray
-    array of shape (dc, dc)
-
+        ndarray
     """
     [e, v] = linalg.eig(z)
     e = e.real
@@ -255,16 +178,12 @@ def _compute_gamma_ip(z, x, gamma):
 
     Parameters
     ----------
-    z: ndarray
+    z : ndarray
         array of shape (dc, dc)
         auxiliary variable,  z_i
-
-    x: ndarray
-        array of shape (dc, dc)
+    x : ndarray
         auxiliary variable, x_i
-
-    gamma: ndarray
-        array of shape (dc, dc)
+    gamma : ndarray
         place where Gamma_i is updated
     """
     a = np.dot(x, x.T)
@@ -277,20 +196,23 @@ class REG_Data:
 
     Parameters
     ----------
-        filter_length: int
-            TRF length in time bins, used to construct the Gabor basis.
-
-    Returns
-    -------
-        an instance of REG_Data
+    tstart : float
+        Start of the TRF in seconds.
+    tstop : float
+        Stop of the TRF in seconds.
+    nlevels : int
+        Decides the density of Gabor atoms. Bigger nlevel -> less dense basis.
+        By default it is set to `1`. `nlevesl > 2` should be used with caution.
     """
     _n_predictor_variables = 1
+    _prewhitened = None
 
-    def __init__(self, tstart, tstop):
+    def __init__(self, tstart, tstop, nlevel=1):
         if tstart != 0:
             raise NotImplementedError("tstart != 0 is not implemented")
         self.tstart = tstart
         self.tstop = tstop
+        self.nlevel = nlevel
         self.meg = []
         self.covariates = []
         self.tstep = None
@@ -301,22 +223,19 @@ class REG_Data:
         self._stim_dims = None
 
     def add_data(self, meg, stim, normalize_regresor=False):
-        """method to load data into REG data instrince
+        """Add sensor measurements and predictor variables for one trial
+
+        Call this function repeatedly to add data for multiple trials/recordings
 
         Parameters
         ----------
-            key: string|tuple
-                dictionary key
-            meg: NDVar
-                meg data
-            stim: NDVar
-                stimulus/ regressor/ predictor variable
-            normalize_regresor: Boolean
-                if True normalizes the regressor/ predictor. Will suggest to normalize data
-                manually. This functionality is not fully working.
-        Returns
-        -------
-            data loaded instance of REG_Data
+        meg : NDVar  (sensor, UTS)
+            MEG Measurements.
+        stim : list of NDVar  ([...,] UTS)
+            One or more predictor variable. The time axis needs to match ``y``.
+        normalize_regresor : Boolean
+            if True normalizes the regressor/ predictor. Will suggest to normalize data
+            manually. This functionality is not fully working.
         """
         meg_time = meg.get_dim('time')
         if self.tstep is None:
@@ -324,10 +243,10 @@ class REG_Data:
             self.tstep = meg_time.tstep
             start = int(round(self.tstart / self.tstep))
             stop = int(round(self.tstop / self.tstep))
-            self.filter_length = stop - start
+            self.filter_length = stop - start + 1
             # basis
-            x = np.linspace(5, 1000, self.filter_length)
-            self.basis = gaussian_basis(self.filter_length, x)
+            x = np.linspace(int(round(1000*self.tstart)), int(round(1000*self.tstop)), self.filter_length)
+            self.basis = gaussian_basis(int(round((self.filter_length-1)/self.nlevel)), x)
             # stimuli
             if isinstance(stim, NDVar):
                 self._stim_sequence = False
@@ -343,6 +262,7 @@ class REG_Data:
                     stim_dims.append(())
                 elif x.ndim == 2:
                     dim, _ = x.get_dims((None, 'time'))
+                    stim_dims.append(dim)
                 else:
                     raise ValueError(f"stim={stim}: stimulus with more than 2 dimensions")
             self._stim_dims = tuple(stim_dims)
@@ -360,7 +280,6 @@ class REG_Data:
                     x_dim, _ = x.get_dims((None, 'time'))
                     if x_dim != dim:
                         raise ValueError(f"stim={stim!r}: dimension {dim} incompatible with previously added data")
-
 
         # check stimuli time axis
         for x in stims:
@@ -388,12 +307,20 @@ class REG_Data:
 
         return self
 
+    def _prewhiten(self, whitening_filter):
+        """Called by DstRF instance"""
+        if self._prewhitened is None:
+            for i, (meg, _) in enumerate(self):
+                self.meg[i] = np.dot(whitening_filter, meg)
+            self._prewhitened = True
+        return self
+
     def _precompute(self):
         """Called by DstRF instance"""
         self._bbt = []
         self._bE = []
         self._EtE = []
-        for b, E, _ in self:
+        for b, E in self:
             self._bbt.append(np.dot(b, b.T))
             self._bE.append(np.dot(b, E))
             self._EtE.append(np.dot(E.T, E))
@@ -408,108 +335,95 @@ class REG_Data:
         return 'Regression data'
 
     def timeslice(self, idx):
-        """gets a time slice (used for cross-validation
+        """gets a time slice (used for cross-validation)
 
         Parameters
         ----------
-            idx: kfold splits
+        idx : kfold splits
         Returns
         -------
             REG_Data instance
         """
-        regdata_ = REG_Data(self.filter_length)
-        regdata_.datakeys = self.datakeys
-        regdata_._n_predictor_variables = self._n_predictor_variables
-        regdata_.tstep = self.tstep
-        regdata_._norm_factor = sqrt(len(idx))
-        for key in regdata_.datakeys:
-            regdata_.meg[key] = self.meg[key][:, idx] * self._norm_factor / regdata_._norm_factor
-            regdata_.covariates[key] = self.covariates[key][idx, :] * self._norm_factor / regdata_._norm_factor
-            # Take care of the normalization too
+        obj = type(self).__new__(self.__class__)
+        # take care of the copied values from the old_obj
+        copy_keys = ['_n_predictor_variables', 'basis', 'filter_length', 'tstart', 'tstep', 'tstop',
+                     '_stim_dims', '_stim_sequence']
+        for key in copy_keys:
+            obj.__dict__.update({key: self.__dict__.get(key, None)})
+        # keep track of the normalization
+        obj._norm_factor = sqrt(len(idx))
+        # add splitted data
+        obj.meg = []
+        obj.covariates = []
+        # Dont forget to take care of the normalization here
+        mul = self._norm_factor / obj._norm_factor  # multiplier to take care of the time normalization
+        for meg, covariate in self:
+            obj.meg.append(meg[:, idx] * mul)
+            obj.covariates.append(covariate[idx, :] * mul)
 
-        return regdata_
+        return obj
 
 
 class DstRF:
-    """Direct estimation of TRFs over the source space
+    """The object-based API for cortical TRF localization
 
     Parameters
     ----------
-    lead_field: NDVar
-        array of shape (K, N)
-        lead-field matrix.
-        both fixed or free orientation lead-field vectors can be used.
-    noise_covariance: ndarray
-        array of shape (K, K)
-        noise covariance matrix
-        use empty-room recordings to generate noise covariance matrix at sensor space.
-    tstart : float
-        Start of the TRF in seconds (default 0).
-    tstop : float
-        Stop of the TRF in seconds (default 0.5).
-    n_iter: int, optionnal
-        number of iterations
-        default is 30
-    n_iterc: int, optionnal
-        number of inner champagne iterations
-        default is 10
-    n_iterf: int, optionnal
-        number of inner FASTA iterations
-        default is 100
+    lead_field : NDVar
+        forward solution a.k.a. lead_field matrix.
+    noise_covariance : ndarray
+        noise covariance matrix, use empty-room recordings to generate noise covariance
+        matrix at sensor space.
+    n_iter : int
+        Number of out iterations of the algorithm, by default set to 10.
+    n_iterc : int
+        Number of Champagne iterations within each outer iteration, by default set to 30.
+    n_iterf : int
+        Number of FASTA iterations within each outer iteration, by default set to 100.
 
     Attributes
     ----------
-    Gamma: dict of lists
+    Gamma: list
         individual source covariance matrices
-    sigma_b: dict of ndarray of shape (K, K)
-        data covariance under the model
+    sigma_b: list of ndarray
+        data covariances under the model
+    theta: ndarray
+        trf coefficients over Gabor basis.
 
     Notes
     -----
     Usage:
 
         1. Initialize :class:`DstRF` instance with desired properties
-        2. Call :meth:`DstRF.add_data` once for each contiguous segment of MEG
+        2. Initialize :class:`REG_Data` instance with desired properties
+        2. Call :meth:`REG_Data.add_data` once for each contiguous segment of MEG
            data
-        3. Call :meth:`DstRF.fit` to estimate the cortical TRFs.
+        3. Call :meth:`DstRF.fit` with REG_Data instance to estimate the cortical TRFs.
+        4. Call :meth:`get_strf` with REG_Data instance to retrieve the cortical TRFs.
     """
     _name = 'cTRFs estimator'
-    _n_predictor_variables = 1
     _cv_info = None
     _crossvalidated = False
 
-    def __init__(self, lead_field, noise_covariance, tstart=0., tstop=0.5, n_iter=30, n_iterc=10, n_iterf=100):
-        # pre-whitening
-        e, v = linalg.eigh(noise_covariance)
-        wf = np.dot(v * _myinv(np.sqrt(e)), v.T.conj())
-
+    def __init__(self, lead_field, noise_covariance, n_iter=30, n_iterc=10, n_iterf=100):
         if lead_field.has_dim('space'):
             g = lead_field.get_data(dims=('sensor', 'source', 'space')).astype(np.float64)
-            g = np.tensordot(wf, g, 1)
             self.lead_field = g.reshape(g.shape[0], -1)
-            self.orientation = 'free'
-            self.space = lead_field.space
+            self.space = lead_field.get_dim('space')
         else:
             g = lead_field.get_data(dims=('sensor', 'source')).astype(np.float64)
-            self.lead_field = np.dot(wf, g)
-            self.orientation = 'fixed'
+            self.lead_field = g
             self.space = None
-        self.sources_n = self.lead_field.shape[1]
 
-        self.lead_field_scaling = linalg.norm(self.lead_field, 2)
-        self.lead_field /= self.lead_field_scaling
-
-        self.source = lead_field.source
-        self.sensor = lead_field.sensor
+        self.source = lead_field.get_dim('source')
+        self.sensor = lead_field.get_dim('sensor')
         self.noise_covariance = noise_covariance.astype(np.float64)
         self.n_iter = n_iter
         self.n_iterc = n_iterc
         self.n_iterf = n_iterf
 
-        self._init_vars()
-        self._init_Sigma_b = None
-        self._init_Gamma = None
-        self._data = REG_Data(tstart, tstop)
+        # self._init_vars()
+        self._whitening_filter = None
 
     def _init_vars(self):
         wf = linalg.cholesky(self.noise_covariance, lower=True)
@@ -520,43 +434,53 @@ class DstRF:
         self.init_sigma_b = sigma_b
 
     def __repr__(self):
-        out = "<[%s orientation] %s on %r>" % (self.orientation, self._name, self.source)
+        if self.space:
+            orientation = 'free'
+        else:
+            orientation = 'fixed'
+        out = "<[%s orientation] %s on %r>" % (orientation, self._name, self.source)
         return out
 
     def __copy__(self):
         obj = type(self).__new__(self.__class__)
-        copy_keys = ['lead_field', 'sources_n', 'orientation', 'space', 'lead_field_scaling', 'source', 'sensor',
-                     'noise_covariance', 'n_iter', 'n_iterc', 'n_iterf', 'eta', 'init_sigma_b', '_init_Sigma_b',
-                     '_init_Gamma']
+        copy_keys = ['lead_field', 'lead_field_scaling', 'source', 'space', 'sensor', '_whitening_filter',
+                     'noise_covariance', 'n_iter', 'n_iterc', 'n_iterf', 'eta', 'init_sigma_b']
         for key in copy_keys:
             obj.__dict__.update({key: self.__dict__.get(key, None)})
         return obj
 
-    def add_data(self, meg, stim):
-        """Add sensor measurements and predictor variables for one trial
+    def _prewhiten(self):
+        if self._whitening_filter is None:
+            e, v = linalg.eigh(self.noise_covariance)
+            wf = np.dot(v * _myinv(np.sqrt(e)), v.T.conj())
+            self._whitening_filter = wf
+            self.lead_field = np.dot(wf, self.lead_field)
+            self.noise_covariance = np.eye(e.shape[0], dtype=np.float64)
+            self.lead_field_scaling = linalg.norm(self.lead_field, 2)
+            self.lead_field /= self.lead_field_scaling
 
-        Call this function repeatedly to add data for multiple trials/recordings
-
-        Parameters
-        ----------
-        meg : NDVar  (sensor, UTS)
-            MEG Measurements.
-        stim: list of NDVar  ([...,] UTS)
-            One or more predictor variable. The time axis needs to match ``y``.
-        """
-        self._data.add_data(meg, stim)
+        # pre compute some necessary initializations
+        # self.eta = (self.lead_field.shape[0] / np.trace(np.dot(self.lead_field, self.lead_field.T)))
+        self.eta = (self.lead_field.shape[0] / np.sum(self.lead_field ** 2))
+        # model data covariance
+        sigma_b = self.noise_covariance + self.eta * np.dot(self.lead_field, self.lead_field.T)
+        self.init_sigma_b = sigma_b
+        return self
 
     def _init_iter(self, data):
-        dc = orientation[self.orientation]
-        self.Gamma = {}
-        self.Sigma_b = {}
-        for key in data.datakeys:
-            self.Gamma[key] = [self.eta * np.eye(dc, dtype=np.float64) for _ in range(self.sources_n)]
-            self.Sigma_b[key] = self.init_sigma_b.copy()
+        if self.space:
+            dc = len(self.space)
+        else:
+            dc = 1
 
-        self.keys = data.datakeys.copy()
+        self.Gamma = []
+        self.Sigma_b = []
+        for _ in range(len(data)):
+            self.Gamma.append([self.eta * np.eye(dc, dtype=np.float64) for _ in range(len(self.source))])
+            self.Sigma_b.append(self.init_sigma_b.copy())
+
         # initializing \Theta
-        self.theta = np.zeros((self.sources_n * dc, data._n_predictor_variables *
+        self.theta = np.zeros((len(self.source) * dc, data._n_predictor_variables *
                                data.basis.shape[1]),
                               dtype=np.float64)
 
@@ -578,24 +502,22 @@ class DstRF:
         no. 1, pp. 641–655, 2010
         Parameters
         ----------
-            data: REG_Data instance
-
-            theta: ndarray
-                co-effecients of the TRFs wrt Gabor atoms.
-
-            use_optimized: boolean (Default True)
-                use this flag to select between C implemenatation and pure numpy
-                implementation of the compute_gamma_i funtions. By default, uses the optimized
-                C versions.
+        data : REG_Data
+            regression data to fit.
+        theta : ndarray
+            co-effecients of the TRFs over Gabor atoms.
         """
         # Choose dc
-        dc = orientation[self.orientation]
+        if self.space:
+            dc = len(self.space)
+        else:
+            dc = 1
 
         idx = kwargs.get('idx', slice(None, None))
 
         n_iterc = kwargs.get('n_iterc', self.n_iterc)
 
-        for meg, covariates, key in data:
+        for key, (meg, covariates) in enumerate(data):
             meg = meg[idx]
             covariates = covariates[idx]
             y = meg - np.dot(np.dot(self.lead_field, theta), covariates.T)
@@ -614,7 +536,7 @@ class DstRF:
                 # compute sigma_b for the next iteration
                 sigma_b = self.noise_covariance.copy()
 
-                for i in range(self.sources_n):
+                for i in range(len(self.source)):
                     # update Xi
                     x = np.dot(gamma[i], np.dot(ytilde.T, lhat[:, i * dc:(i + 1) * dc]).T)
 
@@ -638,7 +560,7 @@ class DstRF:
 
         return self
 
-    def fit(self, data, mu, do_crossvalidation=False, tol=1e-4, verbose=False, **kwargs):
+    def fit(self, data, mu=None, do_crossvalidation=False, tol=1e-4, verbose=False, **kwargs):
         """cTRF estimator implementation
 
         Estimate both TRFs and source variance from the observed MEG data by solving
@@ -650,28 +572,34 @@ class DstRF:
 
         Parameters
         ----------
-        data: REG_Data instance
+        data : REG_Data instance
             meg data and the corresponding stimulus variables
-        mu: float
+        mu : float
             regularization parameter,  promote temporal sparsity and provide guard against
             over-fitting
-        do_crossvalidation: bool
+        do_crossvalidation : bool
             if True, from a wide range of regularizing parameters, the one resulting in
             the least generalization error in a k-fold cross-validation procedure is chosen.
             Unless specified the range and k is chosed from cofig.py. The user can also pass
             several keyword arguments to overwrite them.
-        tol: float (1e-4 Default)
+        tol : float (1e-4 Default)
             tolerence parameter. Decides when to stop outer iterations.
-        verbose: Boolean
+        verbose : Boolean
             If set True prints intermediate values of the cost functions.
             by Default it is set to be False
-        mus: list | ndarray
+        mus : list | ndarray
             range of mu to be considered for cross-validation
-        n_splits: int
+        n_splits : int
             k value used in k-fold cross-validation
-        n_workers: int
+        n_workers : int
             number of workers to be used for cross-validation
         """
+        # pre-whiten the object itself
+        self._prewhiten()
+        # pre-whiten data
+        if isinstance(data, REG_Data):
+            data = data._prewhiten(self._whitening_filter)
+
         # take care of cross-validation
         if do_crossvalidation:
             mus = kwargs.get('mus', None)
@@ -681,17 +609,17 @@ class DstRF:
             self._cv_info = cv_info
             self._crossvalidated = True
         else:
-            pass
             # use the passed mu
+            if mu is None:
+                raise ValueError(f'Needs mu to be specified if do_crossvalidation is False!')
 
         self._set_mu(mu, data)
 
-        if self.orientation == 'fixed':
+        if self.space:
             g_funct = lambda x: g(x, self.mu)
             prox_g = lambda x, t: shrink(x, self.mu * t)
-        elif self.orientation == 'free':
+        else:
             g_funct = lambda x: g_group(x, self.mu)
-            # prox_g = lambda x, t: proxg_group(x, self.mu * t)
             prox_g = lambda x, t: proxg_group_opt(x, self.mu * t)
 
         theta = self.theta
@@ -708,7 +636,6 @@ class DstRF:
             funct, grad_funct = self._construct_f(data)
             Theta = Fasta(funct, g_funct, grad_funct, prox_g, n_iter=self.n_iterf)
             Theta.learn(theta)
-            # ipdb.set_trace()
 
             self.err.append(self._residual(theta, Theta.coefs_))
             theta = Theta.coefs_
@@ -738,13 +665,12 @@ class DstRF:
 
         Parameters
         ---------
-            data: RegData instance"""
-        L = [linalg.cholesky(self.Sigma_b[key], lower=True) for key in self.keys]
-        leadfields = [linalg.solve(L[trial], self.lead_field) for trial in range(len(self.keys))]
+            data: REG_Data instance"""
+        L = [linalg.cholesky(self.Sigma_b[i], lower=True) for i in range(len(data))]
+        leadfields = [linalg.solve(L[i], self.lead_field) for i in range(len(data))]
 
-        bEs = [linalg.solve(L[trial], data._bE[trial]) for trial, key in enumerate(data.datakeys)]
-        bbts = [np.trace(linalg.solve(L[trial], linalg.solve(L[trial], data._bbt[trial]).T))
-               for trial, key in enumerate(data.datakeys)]
+        bEs = [linalg.solve(L[i], data._bE[i]) for i in range(len(data))]
+        bbts = [np.trace(linalg.solve(L[i], linalg.solve(L[i], data._bbt[i]).T)) for i in range(len(data))]
 
         def f(L, x, bbt, bE, EtE):
             Lx = np.dot(L, x)
@@ -757,14 +683,16 @@ class DstRF:
 
         def funct(x):
             fval = 0.0
-            for trial, key in enumerate(self.keys):
-                fval += f(leadfields[trial], x, bbts[trial], bEs[trial], data._EtE[trial])
+            for i in range(len((data))):
+                fval += f(leadfields[i], x, bbts[i], bEs[i], data._EtE[i])
             return fval
 
         def grad_funct(x):
             grad = gradf(leadfields[0], x, bEs[0], data._EtE[0])
-            for trial, key in enumerate(self.keys[1:]):
-                grad += gradf(leadfields[trial+1], x, bEs[trial+1], data._EtE[trial+1])
+            # for trial, key in enumerate(self.keys[1:]):
+            #     grad += gradf(leadfields[trial+1], x, bEs[trial+1], data._EtE[trial+1])
+            for i in range(1, len(data)):
+                grad += gradf(leadfields[i], x, bEs[i], data._EtE[i])
             return grad
 
         return funct, grad_funct
@@ -774,10 +702,14 @@ class DstRF:
 
         Parameters
         ---------
-            data: RegData instance
+        data : REG_Data instance
+
+        Returns
+        -------
+            float
         """
         v = 0
-        for meg, covariate, key in data:
+        for key, (meg, covariate) in enumerate(data):
             y = meg - np.dot(np.dot(self.lead_field, self.theta), covariate.T)
             L = linalg.cholesky(self.Sigma_b[key], lower=True)
             y = linalg.solve(L, y)
@@ -790,10 +722,14 @@ class DstRF:
 
         Parameters
         ---------
-            data: RegData instance
+        data : REG_Data instance
+
+        Returns
+        -------
+            float
         """
         v = 0
-        for meg, covariate, key in data:
+        for key, (meg, covariate) in enumerate(data):
             y = meg - np.dot(np.dot(self.lead_field, self.theta), covariate.T)
             L = linalg.cholesky(self.Sigma_b[key], lower=True)
             y = linalg.solve(L, y)
@@ -806,10 +742,14 @@ class DstRF:
 
         Parameters
         ---------
-            data: RegData instance
+        data : REG_Data instance
+
+        Returns
+        -------
+            float
         """
         v = 0
-        for meg, covariate, key in data:
+        for key, (meg, covariate) in enumerate(data):
             y = meg - np.dot(np.dot(self.lead_field, self.theta), covariate.T)
             # L = linalg.cholesky(self.Sigma_b[key], lower=True)
             # y = linalg.solve(L, y)
@@ -820,42 +760,34 @@ class DstRF:
     def get_strf(self, data):
         """Returns the learned spatio-temporal response function as NDVar
 
-
         Parameters
         ---------
-            data: RegData instance
+        data : REG_Data instance
 
         Returns
         -------
-            NDVar, TRFs
+            NDVar (TRFs)
         """
         trf = self.theta.copy()
-        if data._n_predictor_variables > 1:
-            shape = (trf.shape[0], 3, -1)
+        n_predictor_variables = len(data._stim_dims[0])
+        if n_predictor_variables > 1:
+            shape = (trf.shape[0], n_predictor_variables, -1)
             trf.shape = shape
             trf = trf.swapaxes(1, 0)
 
+        # trf = np.tensordot(trf, data.basis.T, axes=1)
         trf = np.dot(trf, data.basis.T)
 
-        time = UTS(0, data.tstep, trf.shape[-1])
+        time = UTS(data.tstart, data.tstep, trf.shape[-1])
 
-        if self.orientation == 'fixed':
-            if data._n_predictor_variables > 1:
-                dims = (Case, self.source, time)
-            else:
-                dims = (self.source, time)
-            trf = NDVar(trf, dims)
+        if self.space:
+            dims = (self.source, self.space, time)
+            dims = (data._stim_dims + dims)
+            trf = trf.reshape(trf.shape[0], -1, len(self.space), trf.shape[-1])
+        else:
+            dims = (data._stim_dims + (self.source, time))
 
-        elif self.orientation == 'free':
-            dims = (time, self.source, self.space)
-            if data._n_predictor_variables > 1:
-                trfs = []
-                for i in range(data._n_predictor_variables):
-                    trfs.append(NDVar(trf[i, :, :].T.reshape(-1, self.sources_n, 3), dims))
-                trf = combine(trfs)
-            else:
-                trf = NDVar(trf.T.reshape(-1, self.sources_n, 3), dims)
-
+        trf = NDVar(trf, dims)
         return trf
 
     @staticmethod
@@ -876,25 +808,28 @@ class DstRF:
         Lim, Chinghway, and Bin Yu. "Estimation stability with cross-validation (ESCV)."
         Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
 
-        Parameters:
-            models: DstRf instances
+        Parameters
+        ----------
+        models : DstRf instances
+        data : REG_Data instances
 
         Returns
         -------
-            float
-                estimation stability metric
+            float (estimation stability metric)
         """
         Y = []
         for model in models:
             y = np.empty(0)
-            for trial, key in enumerate(data.datakeys):
-                y = np.append(y, np.dot(np.dot(model.lead_field, model.theta), data.covariates[key].T))
+            for trial in range(len(data)):
+                y = np.append(y, np.dot(np.dot(model.lead_field, model.theta), data.covariates[trial].T))
             Y.append(y)
         Y = np.array(Y)
         Y_bar = Y.mean(axis=0)
         VarY = (((Y - Y_bar) ** 2).sum(axis=1)).mean()
-
-        return VarY / (Y_bar ** 2).sum()
+        if (Y_bar ** 2).sum() <= 0:
+            return np.inf
+        else:
+            return VarY / (Y_bar ** 2).sum()
 
     def _get_cvfunc(self, data, n_splits):
         """Method for creating function for crossvalidation
@@ -904,11 +839,11 @@ class DstRF:
 
         Parameters
         ----------
-        data:  object
+        data : object
             the instance should be compatible for fitting the model. In addition to
             that it shall have a timeslice method compatible to kfold objects.
 
-        n_splits: int
+        n_splits : int
             number of folds for cross-validation, If None, it will use values
             specified in config.py.
 
@@ -925,7 +860,7 @@ class DstRF:
             ll1 = []
             ll2 = []
             thetas = []
-            for model_, (train, test) in zip(models_, kf.split(data.meg[data.datakeys[0]][0, :])):
+            for model_, (train, test) in zip(models_, kf.split(data.meg[0][0])):
                 traindata = data.timeslice(train)
                 testdata = data.timeslice(test)
                 model_.fit(traindata, mu, tol=1e-5, verbose=False)
