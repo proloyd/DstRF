@@ -593,7 +593,7 @@ class DstRF:
             number of workers to be used for cross-validation
         """
         # pre-whiten the object itself
-        if self._whitening_filter is not None:
+        if self._whitening_filter is None:
             self._prewhiten()
         # pre-whiten data
         if isinstance(data, REG_Data):
