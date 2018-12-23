@@ -35,17 +35,18 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1, downsamp
     nlevels : int
         Decides the density of Gabor atoms. Bigger nlevel -> less dense basis.
         By default it is set to `1`. `nlevesl > 2` should be used with caution.
-    downsample : boolean
-        False by default. If True down samples noise and meg signals to 200Hz.
     n_iter : int
         Number of out iterations of the algorithm, by default set to 10.
     n_iterc : int
         Number of Champagne iterations within each outer iteration, by default set to 30.
     n_iterf : int
         Number of FASTA iterations within each outer iteration, by default set to 100.
-    normalize : `l1` or None (`l2`)
-        Decides how to normalize stim variables. By default it is None, which does
-        `l2`-normalization.
+    scale_data : bool | 'inplace'
+        Scale ``y`` and ``x`` before boosting: subtract the mean and divide by
+        the standard deviation (when ``error='l2'``) or the mean absolute
+        value (when ``error='l1'``). With ``scale_data=True`` (default) the
+        original ``y`` and ``x`` are left untouched; use ``'inplace'`` to save
+        memory by scaling the original ``y`` and ``x``.
     mu : None or float
         Single regularizer parameter. Needs to be specified when not performing
         cross-validation. Ignored when do_crossvalidation is True.
@@ -69,9 +70,6 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1, downsamp
     from .config import sampling_freq, l_freq, h_freq
     # noise covariance
     if isinstance(noise, NDVar):
-        if downsample:
-            noise = filter_data(noise, l_freq, h_freq, method='fir', fir_design='firwin')
-            noise = resample(noise, sampling_freq)
         er = noise.get_data(('sensor', 'time'))
         noise_cov = np.dot(er, er.T) / er.shape[1]
     elif isinstance(noise, np.ndarray):
@@ -111,12 +109,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1, downsamp
         if r.has_case:
             dim = r.get_dim('case')
             for i in range(len(dim)):
-                if downsample:
-                    data = filter_data(r[i], l_freq, h_freq, method='fir', fir_design='firwin')
-                    data = resample(data, sampling_freq)
-                else:
-                    data = r[i]
-                ds.add_data(data, s, False)
+                ds.add_data(r[i], s, False)
         else:
             ds.add_data(r, s, False)
 

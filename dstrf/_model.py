@@ -347,7 +347,7 @@ class REG_Data:
         obj = type(self).__new__(self.__class__)
         # take care of the copied values from the old_obj
         copy_keys = ['_n_predictor_variables', 'basis', 'filter_length', 'tstart', 'tstep', 'tstop',
-                     '_stim_dims', '_stim_sequence']
+                     '_stim_dims', '_stim_sequence', '_prewhitened']
         for key in copy_keys:
             obj.__dict__.update({key: self.__dict__.get(key, None)})
         # keep track of the normalization
