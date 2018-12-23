@@ -450,17 +450,15 @@ class DstRF:
         return obj
 
     def _prewhiten(self):
-        if self._whitening_filter is None:
-            e, v = linalg.eigh(self.noise_covariance)
-            wf = np.dot(v * _myinv(np.sqrt(e)), v.T.conj())
-            self._whitening_filter = wf
-            self.lead_field = np.dot(wf, self.lead_field)
-            self.noise_covariance = np.eye(e.shape[0], dtype=np.float64)
-            self.lead_field_scaling = linalg.norm(self.lead_field, 2)
-            self.lead_field /= self.lead_field_scaling
+        e, v = linalg.eigh(self.noise_covariance)
+        wf = np.dot(v * _myinv(np.sqrt(e)), v.T.conj())
+        self._whitening_filter = wf
+        self.lead_field = np.dot(wf, self.lead_field)
+        self.noise_covariance = np.eye(e.shape[0], dtype=np.float64)
+        self.lead_field_scaling = linalg.norm(self.lead_field, 2)
+        self.lead_field /= self.lead_field_scaling
 
         # pre compute some necessary initializations
-        # self.eta = (self.lead_field.shape[0] / np.trace(np.dot(self.lead_field, self.lead_field.T)))
         self.eta = (self.lead_field.shape[0] / np.sum(self.lead_field ** 2))
         # model data covariance
         sigma_b = self.noise_covariance + self.eta * np.dot(self.lead_field, self.lead_field.T)
@@ -595,7 +593,8 @@ class DstRF:
             number of workers to be used for cross-validation
         """
         # pre-whiten the object itself
-        self._prewhiten()
+        if self._whitening_filter is not None:
+            self._prewhiten()
         # pre-whiten data
         if isinstance(data, REG_Data):
             data = data._prewhiten(self._whitening_filter)
