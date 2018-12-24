@@ -1,9 +1,12 @@
+import numpy as np
 from ._model import *
 
+DEFAULT_MUs = np.linspace(10, 100, 10) * 1e-4
 
-def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1, downsample=False,
-          n_iter=10, n_iterc=30, n_iterf=100, normalize=None, mu=0.05, do_crossvalidation=False,
-          tol=1e-3, verbose=False, mus=None, n_splits=3, n_workers=4):
+
+def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
+          n_iter=10, n_iterc=30, n_iterf=100, normalize=None, in_place=None,
+          mu='auto', tol=1e-3, verbose=False, n_splits=3, n_workers=None):
     """One shot function for cortical TRF localization
 
     Estimate both TRFs and source variance from the observed MEG data by solving
@@ -41,33 +44,38 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1, downsamp
         Number of Champagne iterations within each outer iteration, by default set to 30.
     n_iterf : int
         Number of FASTA iterations within each outer iteration, by default set to 100.
-    scale_data : bool | 'inplace'
-        Scale ``y`` and ``x`` before boosting: subtract the mean and divide by
-        the standard deviation (when ``error='l2'``) or the mean absolute
-        value (when ``error='l1'``). With ``scale_data=True`` (default) the
-        original ``y`` and ``x`` are left untouched; use ``'inplace'`` to save
-        memory by scaling the original ``y`` and ``x``.
-    mu : None or float
-        Single regularizer parameter. Needs to be specified when not performing
-        cross-validation. Ignored when do_crossvalidation is True.
-    do_crossvalidation : boolean
-        By default False, if True performs crossvalidation with the given `mus`.
+    normalize : bool | 'l2' | 'l1'
+        Scale ``stim`` before model fitting: subtract the mean and divide by
+        the standard deviation (when ``nomrmalize='l2'`` or ``normalize=True``)
+        or the mean absolute value (when ``normalize='l1'``). By default,
+         ``normalize=None`` it leaves ``stim`` data untouched.
+    in_place: bool
+        With ``in_place=False`` (default) the original ``meg`` and ``stims`` are left untouched;
+        use ``in_place=True`` to save memory by using the original ``meg`` and ``stim``.
+    mu : 'auto' or ndarray or list or tuple
+        Choice of regularizer parameter. By default ``mu='auto'`` performs crossvalidation
+        to choose optimal one, from the range
+                ``np.linspace(10, 100, 10) * 1e-4``.
+        Additionally, user can choose to pass a range over which the cross-validation will be done.
+        If a single choice if passed, model corresponding to that value is returned.
+    tol : float
+        Tolerance factor deciding stopping criterion for the overall algorithm. The iterations
+        are stooped when ``norm(trf_new - trf_old)/norm(trf_old) < tol`` condition is met.
+        By default ``tol=1e-3``.
     verbose : boolean
-        if True prints intermidiate results, by default False.
-    mus : list or ndarray
-        if crossvalidation is True, performs crossvalidation with values specified
-        in `mus` array.
+        if True prints intermediate results, by default False.
     n_splits : int
-        number of cross-validation folds
+        number of cross-validation folds. By default it uses 3-fold cross-validation.
     n_workers : int (optional)
-        number of workers to spawn for cross-validation.
+        number of workers to spawn for cross-validation. If None, it will use ``cpu_count/2``.
 
     Returns
     -------
-        tuple (NDVar, DstRF)
+        trf : NDVar
+            TRF estimate
+        model : DstRF
+            The full model
     """
-    from eelbrain import filter_data, resample
-    from .config import sampling_freq, l_freq, h_freq
     # noise covariance
     if isinstance(noise, NDVar):
         er = noise.get_data(('sensor', 'time'))
@@ -98,20 +106,65 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1, downsamp
 
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
     for r, s in zip(meg, stim):
-        # NORMALIZE PREDICTORS:
-        s -= s.mean('time')
-        if normalize is None:
-            s /= s.std('time')
-        elif normalize == 'l1':
-            norm = np.abs(s.x).mean(axis=1)
-            s.x /= norm[:, np.newaxis]
+        if isinstance(s, NDVar):
+            time_dim = s.get_dim('time')
+            if isinstance(r, (tuple, list)):
+                if any(r_.get_dim('time') != time_dim for r_ in r):
+                    raise ValueError("Not all NDVars have the same time dimension")
+                r = combine(r)
+            elif isinstance(r, NDVar):
+                if r.get_dim('time') != time_dim:
+                    raise ValueError("Not all NDVars have the same time dimension")
+
+        if in_place is None:
+            in_place = False
+        if isinstance(in_place, bool):
+            if not in_place:
+                s = s.copy()
+                r = r.copy()
+        else:
+            raise TypeError(f"in_place={in_place!r}, need bool")
+
+        if normalize:  # screens False, None
+            s -= s.mean('time')
+            if isinstance(normalize, bool):  # normalize=True defaults to 'l2'
+                normalize = 'l2'
+            if isinstance(normalize, str):
+                if normalize == 'l2':
+                    s_scale = (s.x ** 2).mean(-1) ** 0.5
+                elif normalize == 'l1':
+                    s_scale = np.abs(s.x).mean(-1)
+                else:
+                    raise ValueError(f"normalize={normalize!r}, need bool or \'l1\' or \'l2\'")
+            else:
+                raise TypeError(f"normalize={normalize!r}, need bool or str")
+
+            s.x /= s_scale[:, np.newaxis]
 
         if r.has_case:
             dim = r.get_dim('case')
             for i in range(len(dim)):
-                ds.add_data(r[i], s, False)
+                ds.add_data(r[i], s)
         else:
-            ds.add_data(r, s, False)
+            ds.add_data(r, s)
+
+    # Regularizer Coice
+    if isinstance(mu, (tuple, list, np.ndarray)):
+        if len(mu) > 1:
+            mus = mu
+            do_crossvalidation = True
+        else:
+            mus = None
+            do_crossvalidation = False
+    elif isinstance(mu, float):
+        mus = None
+        do_crossvalidation = False
+    elif mu == 'auto':
+        mus = DEFAULT_MUs
+        do_crossvalidation = True
+    else:
+        raise ValueError(f"invalid mu={mu!r}, supports tuple, list, np.ndarray or scalar float"
+                         f"optionally, may be left 'auto' if not sure!")
 
     model.fit(ds, mu, do_crossvalidation, tol, verbose, mus=mus, n_splits=n_splits, n_workers=n_workers)
 

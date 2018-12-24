@@ -22,49 +22,14 @@ MEG via Non-Convex Optimization](https://isr.umd.edu/Labs/CSSL/simonlab/pubs/Asi
 Eelbrain ([Download/ Installation Instructions](https://eelbrain.readthedocs.io/en/latest/reference.html))
  
  How to use:
- --------------
- 1. Clone the repo and install using pip.
- 3. Suppose we are interested in subject `XXXX`.
- 2. Create forward source model using MNE-python. Convert it into NDVar format and save as a pickled file
- under `fwdsol` folder:  
-  `XXXX-vol-7-fwd.pickled`
- 3. Create `predictors` folder containing pickled stimulus variables for different conditions in NDVar format.
- Suppose there are two conditions, then the file contains:   
-    `stim_h.pickled`  
-    `stim_l.pickled`
- 4. Create `meg_XXXX` folder containing pickled meg recordings in NDVar format.
- Suppose there are three repetitions for each conditions, then this folder contains:  
-    `meg_h0.pickled`  
-    `meg_h1.pickled`  
-    `meg_h2.pickled`  
-    `meg_l0.pickled`  
-    `meg_l1.pickled`  
-    `meg_l2.pickled`  
-    Don't forget to put the empty room recordings `emptyroom.pickled` in the same folder.  
-5. Change the ROOTDIR in config.py to the folder containing all these folders.
- Also change the max # of iterations as suited. But the default values should do just fine!
- 
- 6. Then from an ipython shell run the following commands:
+ ----------
+run
 ```python
-form dstrf import load_subject
-subject_id = 'XXXX'
-model, data = load_subject(subject_id, normalize=None)
-mu = 0.02  # needs to be chosen by cross-validation
-model.fit(data, mu, tol=1e-5, verbose=True)
-trf = model.get_strf(data)
+h, model = dstrf(meg, stim, lead_field, noise, mu='auto', tstop=1.0, nlevels=2, n_splits=3, normalize='l1')
 ```
-That should take `~10 mins` to spit out cortical trf estimates.
-
-This is just a simple example of cortical TRF estimation. The package also contains many other functions, 
-classes etc, so one can make custom functions according to his/ her workflow needs. 
-
-Recently,
-cross-validation function is also added. So you can run 
-```python
-model.fit(data, do_crossvalidation=True, mus=[0.01, 0.02, 0.05, 0.1], n_splits=3, tol=1e-5, verbose=True)
-```
-to perform a 3-fold cross-validation and then construct the model with the regularization 
-weight among the given range that gives least generalization error.
+to perform a 3-fold cross-validation and then construct the model for 1s long TRF with the regularization 
+weight among the given range that gives least generalization error. For more options, please look at the 
+docstring.
 
 Results
 -------

@@ -5,8 +5,6 @@ import numpy as np
 from multiprocessing import Process, Queue, cpu_count, current_process
 import queue
 
-from . import config as cfg
-
 
 def naive_worker(fun, job_q, result_q):
     """Worker function"""
@@ -41,7 +39,7 @@ def mp_worker(fun, shared_job_q, shared_result_q, nprocs):
     shared_result_q.put(None)
 
 
-def crossvalidate(model, data, mus=None, n_splits=None, n_workers=None):
+def crossvalidate(model, data, mus, n_splits, n_workers=None):
     """used to perform cross-validation of cTRF model
 
     This function assumes `model` class has method _get_cvfunc(data, n_splits)
@@ -58,25 +56,18 @@ def crossvalidate(model, data, mus=None, n_splits=None, n_workers=None):
 
 
     mus: list | ndarray  (floats)
-        The range of the regularizing weights. If None, it will use values
-        specified in config.py.
+        The range of the regularizing weights.
     n_splits: int
-        number of folds for cross-validation, If None, it will use values
-        specified in config.py.
+        number of folds for cross-validation.
     n_workers: int
-        number of workers to be used. If None, it will use values specified
-        in config.py.
+        number of workers to be used. If None, it will use ``cpu_count/2``.
 
     Results
     -------
         float, the best weight. 
     """
-    if mus is None:
-        mus = cfg.mus
-    if n_splits is None:
-        n_splits = cfg.n_splits
     if n_workers is None:
-        n_workers = cfg.n_workers
+        n_workers = int(round(cpu_count()/2))
 
     print('Preparing job...')
     fun = model._get_cvfunc(data, n_splits)

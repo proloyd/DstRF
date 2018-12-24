@@ -89,7 +89,7 @@ def proxg_group_opt(z, mu):
     return z
 
 
-def covariate_from_stim(stim, M, normalize=False):
+def covariate_from_stim(stim, M):
     """Form covariate matrix from stimulus
 
     parameters
@@ -98,8 +98,6 @@ def covariate_from_stim(stim, M, normalize=False):
         predictor variables
     M: int
         order of filter
-    normalize: bool, optional
-        indicates if the stimulus to be normalized
 
     returns
     -------
@@ -111,10 +109,6 @@ def covariate_from_stim(stim, M, normalize=False):
         w = stim.get_data('time')
         if w.ndim == 1:
             w = w[np.newaxis, :]
-
-    if normalize:
-        w -= w.mean(axis=0)
-        w /= w.var(axis=0)
 
     length = w.shape[1]
     Y = []
@@ -222,7 +216,7 @@ class REG_Data:
         self._stim_sequence = None
         self._stim_dims = None
 
-    def add_data(self, meg, stim, normalize_regresor=False):
+    def add_data(self, meg, stim):
         """Add sensor measurements and predictor variables for one trial
 
         Call this function repeatedly to add data for multiple trials/recordings
@@ -233,9 +227,6 @@ class REG_Data:
             MEG Measurements.
         stim : list of NDVar  ([...,] UTS)
             One or more predictor variable. The time axis needs to match ``y``.
-        normalize_regresor : Boolean
-            if True normalizes the regressor/ predictor. Will suggest to normalize data
-            manually. This functionality is not fully working.
         """
         meg_time = meg.get_dim('time')
         if self.tstep is None:
@@ -295,7 +286,7 @@ class REG_Data:
             self._norm_factor = sqrt(y.shape[1])
 
         # add corresponding covariate matrix
-        covariates = np.dot(covariate_from_stim(stim, self.filter_length, normalize=normalize_regresor),
+        covariates = np.dot(covariate_from_stim(stim, self.filter_length),
                             self.basis) / sqrt(y.shape[1])  # Mind the normalization
         if covariates.ndim > 2:
             self._n_predictor_variables = covariates.shape[0]
