@@ -86,7 +86,7 @@ def _update_coefs(x, tau, gradfx, prox, f, g, beta, fk):
     z = prox(x_hat, tau)
     fz = f(z)
     count = 0
-    while fz > fk + (gradfx * (z - x)).sum() + ((z - x) ** 2).sum() / (2 * tau) + g(z):
+    while fz > fk + (gradfx * (z - x)).sum() + ((z - x) ** 2).sum() / (2 * tau):
         # np.square(linalg.norm(z - x, 'fro')) / (2 * tau):
         count += 1
         tau = beta * tau
