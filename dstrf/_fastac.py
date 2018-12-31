@@ -55,7 +55,7 @@ def _compute_residual(deltaf, sg):
     return res, res_r
 
 
-def _update_coefs(x, tau, gradfx, prox, f, beta, fk):
+def _update_coefs(x, tau, gradfx, prox, f, g, beta, fk):
     """Non-monotone line search
 
     parameters
@@ -68,8 +68,10 @@ def _update_coefs(x, tau, gradfx, prox, f, beta, fk):
         gradient operator evaluated at current coefficients
     prox: function handle
         proximal operator of :math:`g(x)`
-    f: function handle
+    f: callable
         smooth differentiable function, :math:`f(x)`
+    g: callable
+        non-smooth function, :math:`g(x)`
     beta: float
         backtracking parameter
     fk: float
@@ -84,7 +86,7 @@ def _update_coefs(x, tau, gradfx, prox, f, beta, fk):
     z = prox(x_hat, tau)
     fz = f(z)
     count = 0
-    while fz > fk + (gradfx * (z - x)).sum() + ((z - x) ** 2).sum() / (2 * tau):
+    while fz > fk + (gradfx * (z - x)).sum() + ((z - x) ** 2).sum() / (2 * tau) + g(z):
         # np.square(linalg.norm(z - x, 'fro')) / (2 * tau):
         count += 1
         tau = beta * tau
@@ -218,7 +220,7 @@ class Fasta:
         for i in range(self.n_iter):
             coefs_next, objective_next, sub_grad, tau, n_backtracks \
                 = _update_coefs(coefs_current, tau_current, grad_current,
-                                self.prox, self.f, self.beta, max(self._funcValues))
+                                self.prox, self.f, self.g, self.beta, max(self._funcValues))
 
             self._funcValues.append(objective_next)
 
