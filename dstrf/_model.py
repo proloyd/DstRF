@@ -15,6 +15,7 @@ from ._fastac import Fasta
 from ._crossvalidation import crossvalidate
 from . import opt
 from .dsyevh3C import compute_gamma_c
+from ._prox import g_o_g, prox_o_g
 
 
 def gaussian_basis(nlevel, span):
@@ -86,6 +87,25 @@ def proxg_group_opt(z, mu):
     z.shape = (-1, 3, l)
     opt.cproxg_group(z, mu, z)
     z.shape = (-1, l)
+    return z
+
+
+def g_o_group(x, mu, group_array, group_idx, w, tol):
+    temp = 0
+    l = x.shape[1]
+    x.shape = (-1, 3, l)
+    for j in range(l):
+        temp += g_o_g(x, mu, group_array, group_idx, w, tol)
+    return temp
+
+
+def g_o_group(x, mu, group_array, group_idx, w, tol):
+    z = np.empty(x.shape)
+    l = x.shape[1]
+    x.shape = (-1, 3, l)
+    for j in range(l):
+        temp = prox_o_g(x, mu, group_array, group_idx, w, tol)
+        z[:, j] = temp.ravel()
     return z
 
 
@@ -369,6 +389,8 @@ class DstRF:
         Number of out iterations of the algorithm, by default set to 10.
     n_iterc : int
         Number of Champagne iterations within each outer iteration, by default set to 30.
+        if n_iterc = 0, it skips Champagne iterations, in this case please set n_iter = 1,
+        and n_iterf = 1000.
     n_iterf : int
         Number of FASTA iterations within each outer iteration, by default set to 100.
 
@@ -637,7 +659,8 @@ class DstRF:
             if self.err[-1] < tol:
                 break
 
-            self._solve(data, theta, **kwargs)
+            if self.n_iterc:
+                self._solve(data, theta, **kwargs)
 
             if verbose:
                 self.objective_vals.append(self.eval_obj(data))
