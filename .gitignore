@@ -1,0 +1,11 @@
+.idea/
+build/
+dstrf.egg-info/
+dstrf/__pycache__/
+dstrf/dsyevh3C/__pycache__/
+dstrf/dsyevh3C/dsyevh3py.cpython-36m-x86_64-linux-gnu.so
+dstrf/opt.c
+dstrf/opt.cpython-36m-x86_64-linux-gnu.so
+dstrf/dsyevh3C/dsyevh3py.c
+dstrf/opt.html
+dstrf/dsyevh3C/dsyevh3py.html
