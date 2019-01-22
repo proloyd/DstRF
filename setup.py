@@ -1,10 +1,11 @@
 from glob import glob
 from distutils.extension import Extension
+from Cython.Distutils import build_ext
 from os.path import pathsep
 from setuptools import setup, find_packages
 import numpy as np
+from os import system
 
-sourcefiles = ['dstrf/dsyevh3C/dsyevc3.c', 'dstrf/dsyevh3C/dsyevh3.c', 'dstrf/dsyevh3C/dsyevq3.c', 'dstrf/dsyevh3C/dsytrd3.c']
 
 # Use cython only if *.pyx files are present (i.e., not in sdist)
 ext_paths = ('dstrf/*%s', 'dstrf/dsyevh3C/*%s')
@@ -40,6 +41,7 @@ setup(
     author="Proloy DAS",
     author_email="proloy@umd.com",
     license="apache 2.0",
+    cmdclass={'build_ext': build_ext},
     include_dirs=[np.get_include()],
     ext_modules=cythonize(ext_modules),
     project_urls={
