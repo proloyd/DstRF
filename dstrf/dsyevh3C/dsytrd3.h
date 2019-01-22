@@ -19,6 +19,6 @@
 #ifndef __DSYTRD3_H
 #define __DSYTRD3_H
 
-inline void dsytrd3(double A[3][3], double Q[3][3], double d[3], double e[2]);
+void dsytrd3(double A[3][3], double Q[3][3], double d[3], double e[2]);
 
 #endif
