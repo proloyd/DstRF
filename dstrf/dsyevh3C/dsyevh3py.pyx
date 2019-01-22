@@ -25,7 +25,6 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
 USA
 """
-#%# distutils: sources = 'dstrf/dsyevh3C/dsyevh3.c'
 # distutils: include_dirs = dstrf/dsyevh3C/
 
 cimport cython
@@ -118,6 +117,7 @@ cdef int mtm(double a[3][3], double b[3][3],
             c[i][j] = sum
 
     return 0
+
 
 @cython.cdivision(True)
 def compute_gamma_c(FLOAT64[:, :] zpy, FLOAT64[:, :] xpy, FLOAT64[:, :] gamma):
