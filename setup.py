@@ -11,7 +11,6 @@ ext_paths = ('dstrf/*%s', 'dstrf/dsyevh3C/*%s')
 if glob(ext_paths[0] % '.pyx'):
     from Cython.Build import cythonize
 
-    # ext_modules = cythonize([path % '.pyx' for path in ext_paths])
     ext_modules = [Extension(path,
                              [path % '.pyx'],
                              extra_compile_args=['-std=c99'],
