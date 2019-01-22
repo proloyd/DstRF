@@ -14,7 +14,6 @@ from eelbrain import UTS, NDVar, combine, Case
 from ._fastac import Fasta
 from ._crossvalidation import crossvalidate
 from . import opt
-from .dsyevh3C import compute_gamma_c
 
 
 def gaussian_basis(nlevel, span):
@@ -180,6 +179,7 @@ def _compute_gamma_ip(z, x, gamma):
     gamma : ndarray
         place where Gamma_i is updated
     """
+    from .dsyevh3C import compute_gamma_c
     a = np.dot(x, x.T)
     compute_gamma_c(z, a, gamma)
     return
@@ -538,7 +538,7 @@ class DstRF:
                     elif dc == 3:
                             _compute_gamma_ip(z, x, gamma[i])
                     else:
-                        NotImplementedError('%i x %i matrices are not implemented yet.')
+                        gamma[i] = _compute_gamma_i(z, x)
 
                     # update sigma_b for next iteration
                     sigma_b += np.dot(self.lead_field[:, i * dc:(i + 1) * dc],
