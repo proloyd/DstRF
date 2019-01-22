@@ -679,8 +679,6 @@ class DstRF:
 
         def grad_funct(x):
             grad = gradf(leadfields[0], x, bEs[0], data._EtE[0])
-            # for trial, key in enumerate(self.keys[1:]):
-            #     grad += gradf(leadfields[trial+1], x, bEs[trial+1], data._EtE[trial+1])
             for i in range(1, len(data)):
                 grad += gradf(leadfields[i], x, bEs[i], data._EtE[i])
             return grad

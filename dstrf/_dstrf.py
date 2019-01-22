@@ -5,7 +5,7 @@ DEFAULT_MUs = np.linspace(10, 100, 10) * 1e-4
 
 
 def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
-          n_iter=10, n_iterc=30, n_iterf=100, normalize=None, in_place=None,
+          n_iter=10, n_iterc=10, n_iterf=100, normalize=None, in_place=None,
           mu='auto', tol=1e-3, verbose=False, n_splits=3, n_workers=None):
     """One shot function for cortical TRF localization
 
@@ -26,9 +26,8 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         where case reflects different trials, different list elements reflects
         different conditions (i.e. stimulus).
     stim : NDVar (case, time) or list of such NDVars
-        where case reflects different predictor variables (e.g. envelope,
-        wordlog10wf etc);  different list elements reflects
-        different conditions (i.e. stimulus).
+        where case reflects different trials;  different list elements reflects
+        different feature variables(e.g. envelope, wordlog10wf etc).
         [ stim2  # NDVar  (case, scalar, time)  (e.g. spectrogram with multiple bands)
          to be implemented]
     tstart : float
@@ -41,7 +40,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     n_iter : int
         Number of out iterations of the algorithm, by default set to 10.
     n_iterc : int
-        Number of Champagne iterations within each outer iteration, by default set to 30.
+        Number of Champagne iterations within each outer iteration, by default set to 10.
     n_iterf : int
         Number of FASTA iterations within each outer iteration, by default set to 100.
     normalize : bool | 'l2' | 'l1'
@@ -94,36 +93,18 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
 
     # Initialize `REG_Data` instance with desired properties
     ds = REG_Data(tstart, tstop, nlevels)
-    if isinstance(meg, list) and isinstance(stim, list):
-        if len(meg) != len(stim):
-            raise ValueError(f'meg list length={len(meg)} is not equal to '
-                             f'stim list length={len(stim)}')
-    elif isinstance(meg, NDVar) and isinstance(stim, NDVar):
-        meg = [meg]
-        stim = [stim]
-    else:
-        raise NotImplementedError
+
+    # data copy?
+    if in_place is None:
+        in_place = False
+    if not isinstance(in_place, bool):
+        raise TypeError(f"in_place={in_place!r}, need bool or None")
 
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
-    for r, s in zip(meg, stim):
-        if isinstance(s, NDVar):
-            time_dim = s.get_dim('time')
-            if isinstance(r, (tuple, list)):
-                if any(r_.get_dim('time') != time_dim for r_ in r):
-                    raise ValueError("Not all NDVars have the same time dimension")
-                r = combine(r)
-            elif isinstance(r, NDVar):
-                if r.get_dim('time') != time_dim:
-                    raise ValueError("Not all NDVars have the same time dimension")
-
-        if in_place is None:
-            in_place = False
-        if isinstance(in_place, bool):
-            if not in_place:
-                s = s.copy()
-                r = r.copy()
-        else:
-            raise TypeError(f"in_place={in_place!r}, need bool")
+    for r, s in iter(meg, stim):
+        if not in_place:
+            s = s.copy()
+            r = r.copy()
 
         if normalize:  # screens False, None
             s -= s.mean('time')
@@ -171,3 +152,40 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     trf = model.get_strf(ds)
 
     return trf, model
+
+
+def iter(meg, stim):
+    if isinstance(meg, list):
+        if isinstance(stim, list):
+            if isinstance(stim[0], NDVar):
+                for meg_, *stim_ in zip(meg, stim):
+                    time_dim = meg_.get_dim('time')
+                    if any(r_.get_dim('time') != time_dim for r_ in stim_):
+                        raise ValueError("Not all NDVars have the same time dimension")
+                    yield (meg_, combine(stim_))
+            else:
+                for meg_, *stim_ in zip(meg, *stim):
+                    time_dim = meg_.get_dim('time')
+                    if any(r_.get_dim('time') != time_dim for r_ in stim_):
+                        raise ValueError("Not all NDVars have the same time dimension")
+                    yield (meg_, combine(stim_))
+        else:
+            raise ValueError(f'Invalid data format {stim}: if meg is a list of NDVar'
+                             ', stim must be a list of NDVars')
+    elif isinstance(meg, NDVar):
+        time_dim = meg.get_dim('time')
+        if isinstance(stim, list):
+            for meg_, *stim_ in zip(meg, *stim):
+                if any(r_.get_dim('time') != time_dim for r_ in stim_):
+                    raise ValueError("Not all NDVars have the same time dimension")
+                yield (meg_, combine(stim_))
+        elif isinstance(stim, NDVar):
+            if stim.get_dim('time') != time_dim:
+                raise ValueError("Not all NDVars have the same time dimension")
+            for meg_, *stim_ in zip(meg, stim):
+                yield (meg_, combine(stim_))
+        else:
+            raise ValueError(f'Invalid data format {stim}: if meg is a NDVar, stim must be a NDVar'
+                             f'or list of NDVars')
+    else:
+        raise ValueError(f'Invalid data format {meg}: Expected NDVar or list of NDVars')
