@@ -14,7 +14,7 @@ from eelbrain import UTS, NDVar, combine, Case
 from ._fastac import Fasta
 from ._crossvalidation import crossvalidate
 from . import opt
-
+from .dsyevh3C import compute_gamma_c
 
 def gaussian_basis(nlevel, span):
     """Construct Gabor basis for the TRFs.
@@ -179,7 +179,6 @@ def _compute_gamma_ip(z, x, gamma):
     gamma : ndarray
         place where Gamma_i is updated
     """
-    from .dsyevh3C import compute_gamma_c
     a = np.dot(x, x.T)
     compute_gamma_c(z, a, gamma)
     return
@@ -679,6 +678,8 @@ class DstRF:
 
         def grad_funct(x):
             grad = gradf(leadfields[0], x, bEs[0], data._EtE[0])
+            # for trial, key in enumerate(self.keys[1:]):
+            #     grad += gradf(leadfields[trial+1], x, bEs[trial+1], data._EtE[trial+1])
             for i in range(1, len(data)):
                 grad += gradf(leadfields[i], x, bEs[i], data._EtE[i])
             return grad
