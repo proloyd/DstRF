@@ -1,6 +1,5 @@
 # cython: boundscheck=False, wraparound=False
 # cython: profile=False
-# distutils: sources = 'dstrf/dsyevh3C/dsyevh3.c'
 # distutils: include_dirs = dstrf/dsyevh3C/
 # optimized functions
 # Author: Proloy Das <proloy@umd.edu>
