@@ -2,8 +2,10 @@ import time
 import copy
 import warnings
 import numpy as np
+from scipy import signal
 from multiprocessing import Process, Queue, cpu_count, current_process
 import queue
+from math import ceil
 
 
 def naive_worker(fun, job_q, result_q):
@@ -39,7 +41,7 @@ def mp_worker(fun, shared_job_q, shared_result_q, nprocs):
     shared_result_q.put(None)
 
 
-def crossvalidate(model, data, mus, n_splits, n_workers=None):
+def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     """used to perform cross-validation of cTRF model
 
     This function assumes `model` class has method _get_cvfunc(data, n_splits)
@@ -145,9 +147,39 @@ def format_to_array(resultdict):
 
     # take care of nan values
     es[np.isnan(es)] = 10  # replace Nan values by some big number (say 10)
-    CVmu = mu[cv2.argmin()]
+    # CVmu = mu[cv2.argmin()]
+    CVmu = mu[cv1.argmin()]
     # ESmu = mu[cv2.argmin():][es[cv2.argmin():].argmin()]
     # ESmu = mu[cv2.argmin() + signal.find_peaks(-es[cv2.argmin():])[0][0]]
-    ESmu = None
+    ESmu = mu[cv1.argmin() + signal.find_peaks(-es[cv1.argmin():])[0][0]]
+    # ESmu = None
 
     return CVmu, ESmu, np.array([mu, cv, cv1, cv2, es])
+
+
+class TimeSeriesSplit:
+    def __init__(self, r=0.05, p=5, d=100):
+        self.ratio = r
+        self.p = p
+        self.d = d
+
+    def _iter_part_masks(self, X):
+        n_v = ceil(self.ratio / (1 + self.ratio) * len(X))
+        # print(n_v)
+        for i in range(self.p, 0, -1):
+            test_mask = np.zeros(len(X), dtype=np.bool)
+            train_mask = np.ones(len(X), dtype=np.bool)
+            # print(i*n_v-self.d)
+            train_mask[-(i*n_v+self.d):] = False
+            if i == 1:
+                test_mask[-i*n_v:] = True
+            else:
+                test_mask[-i * n_v:-(i - 1) * n_v] = True
+            yield (train_mask, test_mask)
+
+    def split(self, X):
+        indices = np.arange(len(X))
+        for (train_mask, test_mask) in self._iter_part_masks(X):
+            train_index = indices[train_mask]
+            test_index = indices[test_mask]
+            yield train_index, test_index

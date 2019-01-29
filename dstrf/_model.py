@@ -840,10 +840,12 @@ class DstRF:
             callable, return the cross-validation metrics
         """
         models_ = [copy.copy(self) for _ in range(n_splits)]
-        from sklearn.model_selection import KFold
+        # from sklearn.model_selection import KFold
+        from ._crossvalidation import TimeSeriesSplit
 
         def cvfunc(mu):
-            kf = KFold(n_splits=n_splits)
+            # kf = KFold(n_splits=n_splits)
+            kf = TimeSeriesSplit(r=0.05, p=n_splits, d=data.basis.shape[1])
             ll = []
             ll1 = []
             ll2 = []

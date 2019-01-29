@@ -1,3 +1,7 @@
+# cython: boundscheck=False, wraparound=False
+# cython: profile=False
+# distutils: sources = 'dstrf/dsyevh3C/dsyevh3.c'
+# distutils: include_dirs = dstrf/dsyevh3C/
 # optimized functions
 # Author: Proloy Das <proloy@umd.edu>
 """ optimized functions for group-prox calculation and 3x3 eigval decomposition
@@ -25,9 +29,6 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
 USA
 """
-#%# distutils: sources = 'dstrf/dsyevh3C/dsyevh3.c'
-# distutils: include_dirs = dstrf/dsyevh3C/
-
 cimport cython
 cimport numpy as cnp
 from libc.math cimport sqrt
