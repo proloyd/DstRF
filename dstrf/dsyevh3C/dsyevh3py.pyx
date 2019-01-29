@@ -30,7 +30,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
 USA
 """
 cimport cython
-# cimport dsyevh3
 cimport numpy as cnp
 from libc.math cimport sqrt
 
