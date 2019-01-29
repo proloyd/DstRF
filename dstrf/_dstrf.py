@@ -1,7 +1,7 @@
 import numpy as np
 from ._model import *
 
-DEFAULT_MUs = np.linspace(10, 100, 10) * 1e-4
+DEFAULT_MUs = np.logspace(-3, -1, 7)
 
 
 def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
@@ -54,7 +54,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     mu : 'auto' or ndarray or list or tuple
         Choice of regularizer parameter. By default ``mu='auto'`` performs crossvalidation
         to choose optimal one, from the range
-                ``np.linspace(10, 100, 10) * 1e-4``.
+                ``np.logspace(-3, -1, 7)``.
         Additionally, user can choose to pass a range over which the cross-validation will be done.
         If a single choice if passed, model corresponding to that value is returned.
     tol : float

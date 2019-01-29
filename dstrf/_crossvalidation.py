@@ -114,7 +114,7 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     print('Crossvalidation Done.')
     print('Building cross-validated model with mu %f' % cvmu)
     
-    return cvmu, cv_info
+    return esmu, cv_info
 
 
 def format_to_array(resultdict):
@@ -145,16 +145,27 @@ def format_to_array(resultdict):
     cv2 = cv2[idx]
     es = es[idx]
 
+    Warn = None
     # take care of nan values
     es[np.isnan(es)] = 10  # replace Nan values by some big number (say 10)
     # CVmu = mu[cv2.argmin()]
     CVmu = mu[cv1.argmin()]
     # ESmu = mu[cv2.argmin():][es[cv2.argmin():].argmin()]
     # ESmu = mu[cv2.argmin() + signal.find_peaks(-es[cv2.argmin():])[0][0]]
-    ESmu = mu[cv1.argmin() + signal.find_peaks(-es[cv1.argmin():])[0][0]]
-    # ESmu = None
+    if CVmu == mu[-1]:
+        ESmu = CVmu
+        Warn = f'CVmu is {CVmu}: extend range of mu towards right'
+    else:
+        ESmu = mu[cv1.argmin() + signal.find_peaks(-es[cv1.argmin():])[0][0]]
+        if ESmu == mu[-1]:
+            Warn = f'ESmu is {ESmu}: extend range of mu towards right'
+    if CVmu == mu[0]:
+        if Warn is None:
+            Warn = f'CVmu is {CVmu}: extend range of mu towards left'
+        else:
+            Warn = f'{Warn}; CVmu is {CVmu}: extend range of mu towards left'
 
-    return CVmu, ESmu, np.array([mu, cv, cv1, cv2, es])
+    return CVmu, ESmu, (np.array([mu, cv, cv1, cv2, es]), Warn)
 
 
 class TimeSeriesSplit:
