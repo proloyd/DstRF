@@ -30,6 +30,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301
 USA
 """
 cimport cython
+# cimport dsyevh3
 cimport numpy as cnp
 from libc.math cimport sqrt
 
@@ -41,11 +42,11 @@ cdef Py_ssize_t J = 3
 cdef extern from "dsyevh3.c":
     int dsyevh3(double A[3][3], double Q[3][3], double w[3])
 
-cdef extern from "dsyevq3.c":
-    int dsyevq3(double A[3][3], double Q[3][3], double w[3])
-
 cdef extern from "dsytrd3.c":
     dsytrd3(double A[3][3], double Q[3][3], double d[3], double e[2])
+
+cdef extern from "dsyevq3.c":
+    int dsyevq3(double A[3][3], double Q[3][3], double w[3])
 
 cdef extern from "dsyevc3.c":
     int dsyevc3(double A[3][3], double w[3])
@@ -119,6 +120,7 @@ cdef int mtm(double a[3][3], double b[3][3],
             c[i][j] = sum
 
     return 0
+
 
 @cython.cdivision(True)
 def compute_gamma_c(FLOAT64[:, :] zpy, FLOAT64[:, :] xpy, FLOAT64[:, :] gamma):

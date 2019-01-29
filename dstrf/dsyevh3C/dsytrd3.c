@@ -25,7 +25,7 @@
 
 
 // ----------------------------------------------------------------------------
-inline void dsytrd3(double A[3][3], double Q[3][3], double d[3], double e[2])
+void dsytrd3(double A[3][3], double Q[3][3], double d[3], double e[2])
 // ----------------------------------------------------------------------------
 // Reduces a symmetric 3x3 matrix to tridiagonal form by applying
 // (unitary) Householder transformations:

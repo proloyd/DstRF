@@ -16,7 +16,6 @@ from ._crossvalidation import crossvalidate
 from . import opt
 from .dsyevh3C import compute_gamma_c
 
-
 def gaussian_basis(nlevel, span):
     """Construct Gabor basis for the TRFs.
 
@@ -538,7 +537,7 @@ class DstRF:
                     elif dc == 3:
                             _compute_gamma_ip(z, x, gamma[i])
                     else:
-                        NotImplementedError('%i x %i matrices are not implemented yet.')
+                        gamma[i] = _compute_gamma_i(z, x)
 
                     # update sigma_b for next iteration
                     sigma_b += np.dot(self.lead_field[:, i * dc:(i + 1) * dc],
@@ -679,6 +678,8 @@ class DstRF:
 
         def grad_funct(x):
             grad = gradf(leadfields[0], x, bEs[0], data._EtE[0])
+            # for trial, key in enumerate(self.keys[1:]):
+            #     grad += gradf(leadfields[trial+1], x, bEs[trial+1], data._EtE[trial+1])
             for i in range(1, len(data)):
                 grad += gradf(leadfields[i], x, bEs[i], data._EtE[i])
             return grad
