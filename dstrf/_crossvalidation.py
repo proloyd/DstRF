@@ -156,7 +156,11 @@ def format_to_array(resultdict):
         ESmu = CVmu
         Warn = f'CVmu is {CVmu}: extend range of mu towards right'
     else:
-        ESmu = mu[cv1.argmin() + signal.find_peaks(-es[cv1.argmin():])[0][0]]
+        try:
+            ESmu = mu[cv1.argmin() + signal.find_peaks(-es[cv1.argmin():])[0][0]]
+        except IndexError:
+            ESmu = CVmu
+            Warn = f'ESmu is {ESmu}: extend range of mu towards right'
         if ESmu == mu[-1]:
             Warn = f'ESmu is {ESmu}: extend range of mu towards right'
     if CVmu == mu[0]:
