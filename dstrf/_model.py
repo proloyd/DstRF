@@ -16,6 +16,7 @@ from ._crossvalidation import crossvalidate
 from . import opt
 from .dsyevh3C import compute_gamma_c
 
+
 def gaussian_basis(nlevel, span):
     """Construct Gabor basis for the TRFs.
 
@@ -295,15 +296,12 @@ class REG_Data:
         x = covariates.reshape(first_dim, -1).astype(np.float64)
         self.covariates.append(x)
 
-        return self
-
     def _prewhiten(self, whitening_filter):
         """Called by DstRF instance"""
         if self._prewhitened is None:
             for i, (meg, _) in enumerate(self):
                 self.meg[i] = np.dot(whitening_filter, meg)
             self._prewhitened = True
-        return self
 
     def _precompute(self):
         """Called by DstRF instance"""
@@ -587,7 +585,7 @@ class DstRF:
             self._prewhiten()
         # pre-whiten data
         if isinstance(data, REG_Data):
-            data = data._prewhiten(self._whitening_filter)
+            data._prewhiten(self._whitening_filter)
 
         # take care of cross-validation
         if do_crossvalidation:

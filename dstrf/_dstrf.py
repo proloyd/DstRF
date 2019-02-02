@@ -1,5 +1,7 @@
+from eelbrain import NDVar, combine
 import numpy as np
-from ._model import *
+from ._model import DstRF, REG_Data
+
 
 DEFAULT_MUs = np.logspace(-3, -1, 7)
 
@@ -70,10 +72,10 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
 
     Returns
     -------
-        trf : NDVar
-            TRF estimate
-        model : DstRF
-            The full model
+    trf : NDVar
+        TRF estimate
+    model : DstRF
+        The full model
     """
     # noise covariance
     if isinstance(noise, NDVar):
