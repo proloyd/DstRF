@@ -215,6 +215,7 @@ class REG_Data:
         self._norm_factor = None
         self._stim_sequence = None
         self._stim_dims = None
+        self.sensor_dim = None
 
     def add_data(self, meg, stim):
         """Add sensor measurements and predictor variables for one trial
@@ -228,6 +229,11 @@ class REG_Data:
         stim : list of NDVar  ([...,] UTS)
             One or more predictor variable. The time axis needs to match ``y``.
         """
+        if self.sensor_dim is None:
+            self.sensor_dim = meg.get_dim('sensor')
+        elif meg.get_dim('sensor') != self.sensor_dim:
+            raise NotImplementedError('combining data segments with different sensors is not supported')
+
         meg_time = meg.get_dim('time')
         if self.tstep is None:
             # initialize time axis
