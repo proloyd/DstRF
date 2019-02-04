@@ -16,6 +16,8 @@ from ._crossvalidation import crossvalidate
 from . import opt
 from .dsyevh3C import compute_gamma_c
 
+_R_tol = np.finfo(np.float64).eps
+
 
 def gaussian_basis(nlevel, span):
     """Construct Gabor basis for the TRFs.
@@ -124,8 +126,10 @@ def covariate_from_stim(stim, M):
 def _myinv(x):
     """Computes inverse"""
     x = np.real(np.array(x))
+    tol = _R_tol * x.max()
+    ind = (np.abs(x) > tol)
     y = np.zeros(x.shape)
-    y[x > 0] = 1 / x[x > 0]
+    y[ind] = 1 / x[ind]
     return y
 
 
@@ -514,16 +518,32 @@ class DstRF:
             covariates = covariates[idx]
             y = meg - np.dot(np.dot(self.lead_field, theta), covariates.T)
             Cb = np.dot(y, y.T)  # empirical data covariance
-            yhat = linalg.cholesky(Cb, lower=True)
+
+            try:
+                yhat = linalg.cholesky(Cb, lower=True)
+            except np.linalg.LinAlgError:
+                hi = y.shape[0] - 1
+                lo = min(y.shape[0] - y.shape[1], 0)
+                e, v = linalg.eigh(Cb, eigvals=(lo, hi))
+                tol = np.abs(e).max() * _R_tol
+                indices = e > tol
+                yhat = v[:, indices] * np.sqrt(e[:, indices])
+
             gamma = self.Gamma[key].copy()
             sigma_b = self.Sigma_b[key].copy()
 
             # champagne iterations
             for it in range(n_iterc):
                 # pre-compute some useful matrices
-                Lc = linalg.cholesky(sigma_b, lower=True)
-                lhat = linalg.solve(Lc, self.lead_field)
-                ytilde = linalg.solve(Lc, yhat)
+                try:
+                    Lc = linalg.cholesky(sigma_b, lower=True)
+                    lhat = linalg.solve(Lc, self.lead_field)
+                    ytilde = linalg.solve(Lc, yhat)
+                except np.linalg.LinAlgError:
+                    e, v = linalg.eigh(sigma_b)
+                    Lc = np.dot(v * _myinv(np.sqrt(e)), v.T.conj())
+                    lhat = np.dot(Lc, self.lead_field)
+                    ytilde = np.dot(Lc, yhat)
 
                 # compute sigma_b for the next iteration
                 sigma_b = self.noise_covariance.copy()
