@@ -67,8 +67,8 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     -------
     esmu : float
         The best weight.
-    cv_info :
-        ???
+    cv_info : ndarray
+        Contains evaluated cross-validation metrics for ``mus``.
     """
     if n_workers is None:
         n_workers = int(round(cpu_count()/2))
