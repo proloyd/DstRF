@@ -1,5 +1,7 @@
+from eelbrain import NDVar, combine
 import numpy as np
-from ._model import *
+from ._model import DstRF, REG_Data
+
 
 DEFAULT_MUs = np.logspace(-3, -1, 7)
 
@@ -70,10 +72,10 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
 
     Returns
     -------
-        trf : NDVar
-            TRF estimate
-        model : DstRF
-            The full model
+    trf : NDVar
+        TRF estimate
+    model : DstRF
+        The full model
     """
     # noise covariance
     if isinstance(noise, NDVar):
@@ -87,9 +89,6 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
                              f'match dim2={noise.shape[0]}')
     else:
         raise NotImplementedError
-
-    # Initialize `DstRF` instance with desired properties
-    model = DstRF(lead_field, noise_cov, n_iter=n_iter, n_iterc=n_iterc, n_iterf=n_iterf)
 
     # Initialize `REG_Data` instance with desired properties
     ds = REG_Data(tstart, tstop, nlevels)
@@ -147,6 +146,10 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         raise ValueError(f"invalid mu={mu!r}, supports tuple, list, np.ndarray or scalar float"
                          f"optionally, may be left 'auto' if not sure!")
 
+    if lead_field.get_dim('sensor') != ds.sensor_dim:
+        lead_field = lead_field.sub(sensor=ds.sensor_dim)
+
+    model = DstRF(lead_field, noise_cov, n_iter=n_iter, n_iterc=n_iterc, n_iterf=n_iterf)
     model.fit(ds, mu, do_crossvalidation, tol, verbose, mus=mus, n_splits=n_splits, n_workers=n_workers)
 
     trf = model.get_strf(ds)

@@ -54,9 +54,8 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     model: model instance
         the model to be validated, here `DstRF`. In addition to that it needs to
         support `copy.copy` function.
-    data: REGdata instance
-
-
+    data: REGdata
+        Data.
     mus: list | ndarray  (floats)
         The range of the regularizing weights.
     n_splits: int
@@ -64,9 +63,12 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     n_workers: int
         number of workers to be used. If None, it will use ``cpu_count/2``.
 
-    Results
+    Returns
     -------
-        float, the best weight. 
+    esmu : float
+        The best weight.
+    cv_info :
+        ???
     """
     if n_workers is None:
         n_workers = int(round(cpu_count()/2))
