@@ -127,7 +127,7 @@ def _myinv(x):
     """Computes inverse"""
     x = np.real(np.array(x))
     tol = _R_tol * x.max()
-    ind = (np.abs(x) > tol)
+    ind = (x > tol)
     y = np.zeros(x.shape)
     y[ind] = 1 / x[ind]
     return y
@@ -449,7 +449,7 @@ class DstRF:
 
     def _prewhiten(self):
         e, v = linalg.eigh(self.noise_covariance)
-        wf = np.dot(v * _myinv(np.sqrt(e)), v.T.conj())
+        wf = np.dot(v * np.sqrt(_myinv(e)), v.T.conj())
         self._whitening_filter = wf
         self.lead_field = np.dot(wf, self.lead_field)
         self.noise_covariance = np.eye(e.shape[0], dtype=np.float64)
@@ -525,7 +525,7 @@ class DstRF:
                 hi = y.shape[0] - 1
                 lo = min(y.shape[0] - y.shape[1], 0)
                 e, v = linalg.eigh(Cb, eigvals=(lo, hi))
-                tol = np.abs(e).max() * _R_tol
+                tol = e[-1] * _R_tol
                 indices = e > tol
                 yhat = v[:, indices] * np.sqrt(e[:, indices])
 
@@ -541,7 +541,7 @@ class DstRF:
                     ytilde = linalg.solve(Lc, yhat)
                 except np.linalg.LinAlgError:
                     e, v = linalg.eigh(sigma_b)
-                    Lc = np.dot(v * _myinv(np.sqrt(e)), v.T.conj())
+                    Lc = np.dot(v * np.sqrt(_myinv(e)), v.T.conj())
                     lhat = np.dot(Lc, self.lead_field)
                     ytilde = np.dot(Lc, yhat)
 
@@ -679,11 +679,27 @@ class DstRF:
         Parameters
         ---------
             data: REG_Data instance"""
-        L = [linalg.cholesky(self.Sigma_b[i], lower=True) for i in range(len(data))]
-        leadfields = [linalg.solve(L[i], self.lead_field) for i in range(len(data))]
+        # L = [linalg.cholesky(self.Sigma_b[i], lower=True) for i in range(len(data))]
+        # leadfields = [linalg.solve(L[i], self.lead_field) for i in range(len(data))]
+        #
+        # bEs = [linalg.solve(L[i], data._bE[i]) for i in range(len(data))]
+        # bbts = [np.trace(linalg.solve(L[i], linalg.solve(L[i], data._bbt[i]).T)) for i in range(len(data))]
 
-        bEs = [linalg.solve(L[i], data._bE[i]) for i in range(len(data))]
-        bbts = [np.trace(linalg.solve(L[i], linalg.solve(L[i], data._bbt[i]).T)) for i in range(len(data))]
+        leadfields = []
+        bEs = []
+        bbts = []
+        for i in range(len(data)):
+            try:
+                L = linalg.cholesky(self.Sigma_b[i], lower=True)
+                leadfields.append(linalg.solve(L, self.lead_field))
+                bEs.append(linalg.solve(L, data._bE[i]))
+                bbts.append(np.trace(linalg.solve(L, linalg.solve(L, data._bbt[i]).T)))
+            except np.linalg.LinAlgError:
+                e, v = linalg.eigh(self.Sigma_b[i])
+                Linv = np.dot(v * np.sqrt(_myinv(e)), v.T.conj())
+                leadfields.append(np.dot(Linv, self.lead_field))
+                bEs.append(np.dot(Linv, data._bE[i]))
+                bbts.append(np.trace(np.dot(Linv, np.dot(Linv, data._bbt[i]).T)))
 
         def f(L, x, bbt, bE, EtE):
             Lx = np.dot(L, x)
@@ -702,8 +718,6 @@ class DstRF:
 
         def grad_funct(x):
             grad = gradf(leadfields[0], x, bEs[0], data._EtE[0])
-            # for trial, key in enumerate(self.keys[1:]):
-            #     grad += gradf(leadfields[trial+1], x, bEs[trial+1], data._EtE[trial+1])
             for i in range(1, len(data)):
                 grad += gradf(leadfields[i], x, bEs[i], data._EtE[i])
             return grad
