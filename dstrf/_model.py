@@ -523,7 +523,7 @@ class DstRF:
                 yhat = linalg.cholesky(Cb, lower=True)
             except np.linalg.LinAlgError:
                 hi = y.shape[0] - 1
-                lo = min(y.shape[0] - y.shape[1], 0)
+                lo = max(y.shape[0] - y.shape[1], 0)
                 e, v = linalg.eigh(Cb, eigvals=(lo, hi))
                 tol = e[-1] * _R_tol
                 indices = e > tol
