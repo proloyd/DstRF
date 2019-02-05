@@ -12,26 +12,26 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     """One shot function for cortical TRF localization
 
     Estimate both TRFs and source variance from the observed MEG data by solving
-    the Bayesian optimization problem mentioned in the paper:
-    P. Das, C. Brodbeck, J. Z. Simon, B. Babadi, Cortical Localization of the
+    the Bayesian optimization problem mentioned in the paper _[1].
+    .. [1] P. Das, C. Brodbeck, J. Z. Simon, B. Babadi, Cortical Localization of the
     Auditory Temporal Response Function from MEG via Non-Convex Optimization;
     2018 Asilomar Conference on Signals, Systems, and Computers, Oct. 28–31,
     Pacific Grove, CA(invited).
 
     Parameters
     ----------
-    lead_field : NDVar
-        forward solution a.k.a. lead_field matrix.
-    noise : NDVar or ndarray
-        empty room data as NDVar or the covariance matrix as an ndarray.
     meg :  NDVar (case, sensor, time) or list of such NDVars
         where case reflects different trials, different list elements reflects
         different conditions (i.e. stimulus).
     stim : NDVar (case, time) or list of such NDVars
         where case reflects different trials;  different list elements reflects
         different feature variables(e.g. envelope, wordlog10wf etc).
-        [ stim2  # NDVar  (case, scalar, time)  (e.g. spectrogram with multiple bands)
-         to be implemented]
+        TODO: [ stim2  # NDVar  (case, scalar, time)  (e.g. spectrogram with
+         multiple bands) to be implemented]
+    lead_field : NDVar
+        forward solution a.k.a. lead_field matrix.
+    noise : NDVar or ndarray
+        empty room data as NDVar or the covariance matrix as an ndarray.
     tstart : float
         Start of the TRF in seconds.
     tstop : float
