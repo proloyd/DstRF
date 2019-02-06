@@ -536,7 +536,7 @@ class DstRF:
                 e, v = linalg.eigh(Cb, eigvals=(lo, hi))
                 tol = e[-1] * _R_tol
                 indices = e > tol
-                yhat = v[:, indices] * np.sqrt(e[:, indices])
+                yhat = v[:, indices] * np.sqrt(e[indices])
 
             gamma = self.Gamma[key].copy()
             sigma_b = self.Sigma_b[key].copy()
