@@ -133,6 +133,16 @@ def _myinv(x):
     return y
 
 
+def _inv_sqrtm(m):
+    e, v = linalg.eigh(m)
+    e = e.real
+    tol = _R_tol * e.max()
+    ind = (e > tol)
+    y = np.zeros(e.shape)
+    y[ind] = 1 / e[ind]
+    return np.dot(v * np.sqrt(y), v.T.conj())
+
+
 def _compute_gamma_i(z, x):
     """ Comptes Gamma_i
 
@@ -448,11 +458,10 @@ class DstRF:
         return obj
 
     def _prewhiten(self):
-        e, v = linalg.eigh(self.noise_covariance)
-        wf = np.dot(v * np.sqrt(_myinv(e)), v.T.conj())
+        wf = _inv_sqrtm(self.noise_covariance)
         self._whitening_filter = wf
         self.lead_field = np.dot(wf, self.lead_field)
-        self.noise_covariance = np.eye(e.shape[0], dtype=np.float64)
+        self.noise_covariance = np.eye(self.lead_field.shape[0], dtype=np.float64)
         self.lead_field_scaling = linalg.norm(self.lead_field, 2)
         self.lead_field /= self.lead_field_scaling
 
@@ -540,8 +549,7 @@ class DstRF:
                     lhat = linalg.solve(Lc, self.lead_field)
                     ytilde = linalg.solve(Lc, yhat)
                 except np.linalg.LinAlgError:
-                    e, v = linalg.eigh(sigma_b)
-                    Lc = np.dot(v * np.sqrt(_myinv(e)), v.T.conj())
+                    Lc = _inv_sqrtm(sigma_b)
                     lhat = np.dot(Lc, self.lead_field)
                     ytilde = np.dot(Lc, yhat)
 
@@ -679,12 +687,6 @@ class DstRF:
         Parameters
         ---------
             data: REG_Data instance"""
-        # L = [linalg.cholesky(self.Sigma_b[i], lower=True) for i in range(len(data))]
-        # leadfields = [linalg.solve(L[i], self.lead_field) for i in range(len(data))]
-        #
-        # bEs = [linalg.solve(L[i], data._bE[i]) for i in range(len(data))]
-        # bbts = [np.trace(linalg.solve(L[i], linalg.solve(L[i], data._bbt[i]).T)) for i in range(len(data))]
-
         leadfields = []
         bEs = []
         bbts = []
@@ -695,8 +697,7 @@ class DstRF:
                 bEs.append(linalg.solve(L, data._bE[i]))
                 bbts.append(np.trace(linalg.solve(L, linalg.solve(L, data._bbt[i]).T)))
             except np.linalg.LinAlgError:
-                e, v = linalg.eigh(self.Sigma_b[i])
-                Linv = np.dot(v * np.sqrt(_myinv(e)), v.T.conj())
+                Linv = _inv_sqrtm(self.Sigma_b[i])
                 leadfields.append(np.dot(Linv, self.lead_field))
                 bEs.append(np.dot(Linv, data._bE[i]))
                 bbts.append(np.trace(np.dot(Linv, np.dot(Linv, data._bbt[i]).T)))
