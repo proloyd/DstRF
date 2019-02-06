@@ -466,7 +466,7 @@ class DstRF:
         self.lead_field /= self.lead_field_scaling
 
         # pre compute some necessary initializations
-        self.eta = (self.lead_field.shape[0] / np.sum(self.lead_field ** 2))
+        self.eta = (self.lead_field.shape[0] / np.sum(self.lead_field ** 2)) * 1e-2
         # model data covariance
         sigma_b = self.noise_covariance + self.eta * np.dot(self.lead_field, self.lead_field.T)
         self.init_sigma_b = sigma_b
