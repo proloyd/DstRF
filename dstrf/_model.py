@@ -802,6 +802,8 @@ class DstRF:
             shape = (trf.shape[0], n_predictor_variables, -1)
             trf.shape = shape
             trf = trf.swapaxes(1, 0)
+        else:
+            trf = trf[np.newaxis, :]
 
         # trf = np.tensordot(trf, data.basis.T, axes=1)
         trf = np.dot(trf, data.basis.T)
@@ -811,7 +813,8 @@ class DstRF:
         if self.space:
             dims = (self.source, self.space, time)
             dims = (data._stim_dims + dims)
-            trf = trf.reshape(trf.shape[0], -1, len(self.space), trf.shape[-1])
+            shape = (n_predictor_variables, len(self.source), len(self.space), trf.shape[-1])
+            trf = trf.reshape(shape)
         else:
             dims = (data._stim_dims + (self.source, time))
 
