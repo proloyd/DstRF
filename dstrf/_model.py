@@ -580,7 +580,7 @@ class DstRF:
 
         return self
 
-    def fit(self, data, mu=None, do_crossvalidation=False, tol=1e-4, verbose=False, **kwargs):
+    def fit(self, data, mu=None, do_crossvalidation=False, tol=1e-4, verbose=False, use_ES=False, **kwargs):
         """cTRF estimator implementation
 
         Estimate both TRFs and source variance from the observed MEG data by solving
@@ -607,12 +607,17 @@ class DstRF:
         verbose : Boolean
             If set True prints intermediate values of the cost functions.
             by Default it is set to be False
+        use_ES : Boolean
+            use estimation stability criterion _[1] to choose the best ``mu``. (False, by default)
         mus : list | ndarray
             range of mu to be considered for cross-validation
         n_splits : int
             k value used in k-fold cross-validation
         n_workers : int
             number of workers to be used for cross-validation
+
+        ..[1] Lim, Chinghway, and Bin Yu. "Estimation stability with cross-validation (ESCV)."
+        Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
         """
         # pre-whiten the object itself
         if self._whitening_filter is None:
@@ -626,9 +631,13 @@ class DstRF:
             mus = kwargs.get('mus', None)
             n_splits = kwargs.get('n_splits', None)
             n_workers = kwargs.get('n_workers', None)
-            mu, cv_info = crossvalidate(self, data, mus, n_splits, n_workers)
+            cvmu, esmu, cv_info = crossvalidate(self, data, mus, n_splits, n_workers)
             self._cv_info = cv_info
             self._crossvalidated = True
+            if use_ES:
+                mu = esmu
+            else:
+                mu = cvmu
         else:
             # use the passed mu
             if mu is None:

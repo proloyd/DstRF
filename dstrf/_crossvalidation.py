@@ -116,7 +116,7 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     print('Crossvalidation Done.')
     print('Building cross-validated model with mu %f' % cvmu)
     
-    return esmu, cv_info
+    return cvmu, esmu, cv_info
 
 
 def format_to_array(resultdict):

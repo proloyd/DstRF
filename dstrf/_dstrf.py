@@ -8,7 +8,8 @@ DEFAULT_MUs = np.logspace(-3, -1, 7)
 
 def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
           n_iter=10, n_iterc=10, n_iterf=100, normalize=None, in_place=None,
-          mu='auto', tol=1e-3, verbose=False, n_splits=3, n_workers=None):
+          mu='auto', tol=1e-3, verbose=False, n_splits=3, n_workers=None,
+          use_ES=False):
     """One shot function for cortical TRF localization
 
     Estimate both TRFs and source variance from the observed MEG data by solving
@@ -69,6 +70,10 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         number of cross-validation folds. By default it uses 3-fold cross-validation.
     n_workers : int (optional)
         number of workers to spawn for cross-validation. If None, it will use ``cpu_count/2``.
+    use_ES : Boolean (optional)
+        use estimation stability criterion _[2] to choose the best ``mu``. (False, by default)
+        ..[2] Lim, Chinghway, and Bin Yu. "Estimation stability with cross-validation (ESCV)."
+        Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
 
     Returns
     -------
@@ -128,7 +133,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         else:
             ds.add_data(r, s)
 
-    # Regularizer Coice
+    # Regularizer Choice
     if isinstance(mu, (tuple, list, np.ndarray)):
         if len(mu) > 1:
             mus = mu
@@ -150,7 +155,8 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         lead_field = lead_field.sub(sensor=ds.sensor_dim)
 
     model = DstRF(lead_field, noise_cov, n_iter=n_iter, n_iterc=n_iterc, n_iterf=n_iterf)
-    model.fit(ds, mu, do_crossvalidation, tol, verbose, mus=mus, n_splits=n_splits, n_workers=n_workers)
+    model.fit(ds, mu, do_crossvalidation, tol, verbose, mus=mus, n_splits=n_splits,
+              n_workers=n_workers, use_ES=use_ES)
 
     trf = model.get_strf(ds)
 
