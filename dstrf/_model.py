@@ -463,6 +463,15 @@ class DstRF:
             obj.__dict__.update({key: self.__dict__.get(key, None)})
         return obj
 
+    _PICKLE_ATTRS = ('_basis', '_cv_info', '_name', '_stim_dims', 'source', 'space', 'theta', 'tstart', 'tstep', 'tstop')
+
+    def __getstate__(self):
+        return {k: getattr(self, k) for k in self._PICKLE_ATTRS}
+
+    def __setstate__(self, state):
+        for k in self._PICKLE_ATTRS:
+            setattr(self, k, state[k])
+
     def _prewhiten(self):
         wf = _inv_sqrtm(self.noise_covariance)
         self._whitening_filter = wf
