@@ -6,7 +6,7 @@ import numpy as np
 # Some specialized functions
 from numpy.core.umath_tests import inner1d
 from scipy import linalg
-from math import sqrt
+from math import sqrt, log10
 
 # eelbrain imports
 from eelbrain import UTS, NDVar, combine, Case
@@ -924,3 +924,19 @@ class DstRF:
             return {'cv': val1, 'es': val2, 'cv1': val3, 'cv2': val4}
 
         return cvfunc
+
+    def _auto_mu(self, data):
+        self._solve(data, self.theta, n_iterc=30)
+        _, grad_funct = self._construct_f(data)
+        if self.space:
+            x = grad_funct(self.theta)
+            l = x.shape[1]
+            x.shape = (-1, 3, l)
+            norm = np.sqrt((x ** 2).sum(axis=1))
+        else:
+            x = grad_funct(self.theta)
+            norm = np.abs(x)
+
+        hi = log10(np.percentile(norm, 95.0))
+        lo = hi - 2
+        return np.logspace(lo, hi, 7)
