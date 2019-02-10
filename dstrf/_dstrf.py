@@ -145,7 +145,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         mus = None
         do_crossvalidation = False
     elif mu == 'auto':
-        mus = DEFAULT_MUs
+        mus = 'auto'
         do_crossvalidation = True
     else:
         raise ValueError(f"invalid mu={mu!r}, supports tuple, list, np.ndarray or scalar float"

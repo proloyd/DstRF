@@ -495,6 +495,7 @@ class DstRF:
         self.mu = mu
         self._init_iter(data)
         data._precompute()
+        self._solve(data, self.theta, n_iterc=30)
         return self
 
     def _solve(self, data, theta, **kwargs):
@@ -580,7 +581,7 @@ class DstRF:
 
         return self
 
-    def fit(self, data, mu=None, do_crossvalidation=False, tol=1e-4, verbose=False, use_ES=False, **kwargs):
+    def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-4, verbose=False, use_ES=False, **kwargs):
         """cTRF estimator implementation
 
         Estimate both TRFs and source variance from the observed MEG data by solving
@@ -609,7 +610,7 @@ class DstRF:
             by Default it is set to be False
         use_ES : Boolean
             use estimation stability criterion _[1] to choose the best ``mu``. (False, by default)
-        mus : list | ndarray
+        mus : list | ndarray | 'auto' (default)
             range of mu to be considered for cross-validation
         n_splits : int
             k value used in k-fold cross-validation
@@ -629,6 +630,8 @@ class DstRF:
         # take care of cross-validation
         if do_crossvalidation:
             mus = kwargs.get('mus', None)
+            if mus == 'auto':
+                mus = self._auto_mu(data)
             n_splits = kwargs.get('n_splits', None)
             n_workers = kwargs.get('n_workers', None)
             cvmu, esmu, cv_info = crossvalidate(self, data, mus, n_splits, n_workers)
@@ -925,18 +928,18 @@ class DstRF:
 
         return cvfunc
 
-    def _auto_mu(self, data):
-        self._solve(data, self.theta, n_iterc=30)
+    def _auto_mu(self, data, p=95.0):
+        self._set_mu(0.0, data)
         _, grad_funct = self._construct_f(data)
         if self.space:
             x = grad_funct(self.theta)
             l = x.shape[1]
             x.shape = (-1, 3, l)
-            norm = np.sqrt((x ** 2).sum(axis=1))
+            norm = np.linalg.norm(x, axis=1)
         else:
             x = grad_funct(self.theta)
             norm = np.abs(x)
 
-        hi = log10(np.percentile(norm, 95.0))
+        hi = log10(np.percentile(norm, p))
         lo = hi - 2
         return np.logspace(lo, hi, 7)
