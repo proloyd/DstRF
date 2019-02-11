@@ -41,6 +41,46 @@ def mp_worker(fun, shared_job_q, shared_result_q, nprocs):
     time.sleep(0.1)
     shared_result_q.put(None)
 
+class collect_output(Process):
+    def __init__(self, N, result_q):
+        Process.__init__(self)
+        self.N = N
+        self.result_q = result_q
+
+    def run(self):
+        prog = tqdm(total=self.N, desc="Crossvalidation", unit='mu', unit_scale=True)
+        numresults = 0
+        resultdict = {}
+        n_attempts = 0
+        while True:
+            try:
+                outdict = self.result_q.get(False)  # no wait
+                if outdict is None:
+                    prog.close()
+                    break
+                resultdict.update(outdict)
+                prog.update(n=len(outdict))
+                time.sleep(0.01)
+                numresults = len(resultdict)
+                # print('Received %i objects, waiting for %s more' % (numresults, self.N - numresults))
+            except queue.Empty:
+                time.sleep(10)
+                prog.update(n=0)
+                # print('Sleeping for 10s')
+            except EOFError:
+                print('Opps! EOFError encountered.')
+                n_attempts += 1
+                print('Retrying %i th time' % n_attempts)
+                if n_attempts > 100:
+                    break
+
+        if numresults < self.N:
+            warnings.warn('%i objects are missing' % (self.N - numresults), )
+
+        self.result_q.put(format_to_array(resultdict))
+        time.sleep(0.1)
+        return
+
 
 def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     """used to perform cross-validation of cTRF model
@@ -74,50 +114,57 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     if n_workers is None:
         n_workers = int(round(cpu_count()/2))
 
-    print('Preparing job...')
     fun = model._get_cvfunc(data, n_splits)
-
-    print('Preparation done!')
 
     job_q = Queue()
     result_q = Queue()
 
-    print('Putting job into queue')
+    # print('Putting job into queue')
     for mu in mus:
         job_q.put([mu])  # put the job as a list.
-        
+
+    prog = collect_output(len(mus), result_q)
+    prog.start()
     mp_worker(fun, job_q, result_q, n_workers)
+    prog.join()
 
-    numresults = 0
-    resultdict = {}
-    n_attempts = 0
-    prog = tqdm(total=len(mus), desc="Total", unit='B', unit_scale=True)
-    while True:
-        try:
-            outdict = result_q.get(False)  # no wait
-            if outdict is None:
-                break
-            resultdict.update(outdict)
-            prog.n += len(outdict)
-            prog.update(0)
-            numresults = len(resultdict)
-            # print('Received %i objects, waiting for %s more' % (numresults, len(mus) - numresults))
-        except queue.Empty:
-            time.sleep(10)
-            print('Sleeping for 10s')
-        except EOFError:
-            print('Opps! EOFError encountered.')
-            n_attempts += 1
-            print('Retrying %i th time' % n_attempts)
-            if n_attempts > 100:
-                break
+    # numresults = 0
+    # resultdict = {}
+    # n_attempts = 0
+    # while True:
+    #     try:
+    #         outdict = result_q.get(False)  # no wait
+    #         # if outdict is None:
+    #         #     prog.close()
+    #         #     break
+    #         resultdict.update(outdict)
+    #         # prog.n += len(outdict)
+    #         prog.update(n=len(outdict))
+    #         time.sleep(0.01)
+    #         numresults = len(resultdict)
+    #         if numresults == len(mus):
+    #             prog.close()
+    #             break
+    #         print('Received %i objects, waiting for %s more' % (numresults, len(mus) - numresults))
+    #     except queue.Empty:
+    #         time.sleep(10)
+    #         prog.update(n=0)
+    #         # print('Sleeping for 10s')
+    #     except EOFError:
+    #         print('Opps! EOFError encountered.')
+    #         n_attempts += 1
+    #         print('Retrying %i th time' % n_attempts)
+    #         if n_attempts > 100:
+    #             break
+    #
+    # if numresults < len(mus):
+    #     warnings.warn('%i objects are missing' % (len(mus) - numresults), )
+    #
+    # cvmu, esmu, cv_info = format_to_array(resultdict)
 
-    if numresults < len(mus):
-        warnings.warn('%i objects are missing' % (len(mus) - numresults), )
+    cvmu, esmu, cv_info = result_q.get()
 
-    cvmu, esmu, cv_info = format_to_array(resultdict)
-    
-    print('Crossvalidation Done.')
+    # print('Crossvalidation Done.')
     print('Building cross-validated model with mu %f' % cvmu)
     
     return cvmu, esmu, cv_info

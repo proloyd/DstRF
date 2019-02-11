@@ -7,6 +7,7 @@ import numpy as np
 from numpy.core.umath_tests import inner1d
 from scipy import linalg
 from math import sqrt, log10
+from tqdm import tqdm
 
 # eelbrain imports
 from eelbrain import UTS, NDVar, combine, Case
@@ -635,6 +636,7 @@ class DstRF:
         ..[1] Lim, Chinghway, and Bin Yu. "Estimation stability with cross-validation (ESCV)."
         Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
         """
+        debug = kwargs.get('debug', False)
         # pre-whiten the object itself
         if self._whitening_filter is None:
             self._prewhiten()
@@ -675,11 +677,13 @@ class DstRF:
         self.err = []
         if verbose:
             self.objective_vals = []
-            start = time.time()
+            iter_o = tqdm(range(self.n_iter))
+        else:
+            iter_o = range(self.n_iter)
 
         # run iterations
-        for i in (range(self.n_iter)):
-            if verbose:
+        for i in iter_o:
+            if debug:
                 print('iteration: %i:' % i)
             funct, grad_funct = self._construct_f(data)
             Theta = Fasta(funct, g_funct, grad_funct, prox_g, n_iter=self.n_iterf)
@@ -689,7 +693,7 @@ class DstRF:
             theta = Theta.coefs_
             self.theta = theta
 
-            if verbose:
+            if debug:
                 print('objective after fasta: %10f' % self.eval_obj(data))
 
             if self.err[-1] < tol:
@@ -699,18 +703,16 @@ class DstRF:
 
             if verbose:
                 self.objective_vals.append(self.eval_obj(data))
+            if debug:
                 print("objective value after champ:{:10f}\n "
                       "%% change:{:2f}".format(self.objective_vals[-1], self.err[-1]*100))
-
-        if verbose:
-            end = time.time()
-            print("Time elapsed: {:10f} s".format(end - start))
 
         self._stim_dims = data._stim_dims
         self._basis = data.basis
         self.tstart = data.tstart
         self.tstep = data.tstep
         self.tstop = data.tstop
+
         return self
 
     def _construct_f(self, data,):
