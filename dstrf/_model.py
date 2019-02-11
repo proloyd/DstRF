@@ -712,7 +712,6 @@ class DstRF:
         self.tstart = data.tstart
         self.tstep = data.tstep
         self.tstop = data.tstop
-
         return self
 
     def _construct_f(self, data,):

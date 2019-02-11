@@ -156,9 +156,8 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
 
     model = DstRF(lead_field, noise_cov, n_iter=n_iter, n_iterc=n_iterc, n_iterf=n_iterf)
     model.fit(ds, mu, do_crossvalidation, tol, verbose, mus=mus, n_splits=n_splits,
-              n_workers = n_workers, use_ES = use_ES, ** kwargs)
+              n_workers=n_workers, use_ES=use_ES, ** kwargs)
     return model
-
 
 
 def iter_data(meg, stim):
