@@ -130,7 +130,6 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     if cv_info[-1] is not None:
         warnings.warn(cv_info[-1])
     print('Building cross-validated model with mu %f' % cvmu)
-
     return cvmu, esmu, cv_info
 
 
