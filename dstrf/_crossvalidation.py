@@ -6,6 +6,7 @@ from scipy import signal
 from multiprocessing import Process, Queue, cpu_count, current_process
 import queue
 from math import ceil
+from tqdm import tqdm
 
 
 def naive_worker(fun, job_q, result_q):
@@ -14,13 +15,13 @@ def naive_worker(fun, job_q, result_q):
     while True:
         try:
             job = job_q.get_nowait()
-            print('%s got %s mus...' % (myname, len(job)))
+            # print('%s got %s mus...' % (myname, len(job)))
             for mu in job:
                 outdict = {mu: fun(mu)}
                 result_q.put(outdict)
-            print('%s done' % myname)
+            # print('%s done' % myname)
         except queue.Empty:
-            print('returning from %s process' % myname)
+            # print('returning from %s process' % myname)
             return
 
 
@@ -90,14 +91,17 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     numresults = 0
     resultdict = {}
     n_attempts = 0
+    prog = tqdm(total=len(mus), desc="Total", unit='B', unit_scale=True)
     while True:
         try:
             outdict = result_q.get(False)  # no wait
             if outdict is None:
                 break
             resultdict.update(outdict)
+            prog.n += len(outdict)
+            prog.update(0)
             numresults = len(resultdict)
-            print('Received %i objects, waiting for %s more' % (numresults, len(mus) - numresults))
+            # print('Received %i objects, waiting for %s more' % (numresults, len(mus) - numresults))
         except queue.Empty:
             time.sleep(10)
             print('Sleeping for 10s')
