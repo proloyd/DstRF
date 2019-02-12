@@ -250,6 +250,26 @@ class REG_Data:
             raise NotImplementedError('combining data segments with different sensors is not supported')
 
         meg_time = meg.get_dim('time')
+        if self._stim_sequence is None:
+            self._stim_sequence = not isinstance(stim, NDVar)
+        elif self._stim_sequence == isinstance(stim, NDVar):
+            raise TypeError(f"stim={stim!r}: Incompatible with previously added stimulus")
+        stims = stim if self._stim_sequence else [stim]
+        stim_dims = []
+        for x in stims:
+            # check stimuli time axis
+            if x.get_dim('time') != meg_time:
+                raise ValueError(f"stim={stim!r}: time axis incompatible with meg")
+
+            if x.ndim == 1:
+                stim_dims.append(None)
+            elif x.ndim == 2:
+                dim, _ = x.get_dims((None, 'time'))
+                stim_dims.append(dim)
+            else:
+                raise ValueError(f"stim={stim}: stimulus with more than 2 dimensions")
+        stim_dims = tuple(stim_dims)
+
         if self.tstep is None:
             # initialize time axis
             self.tstep = meg_time.tstep
@@ -260,43 +280,13 @@ class REG_Data:
             x = np.linspace(int(round(1000*self.tstart)), int(round(1000*self.tstop)), self.filter_length)
             self.basis = gaussian_basis(int(round((self.filter_length-1)/self.nlevel)), x)
             # stimuli
-            if isinstance(stim, NDVar):
-                self._stim_sequence = False
-                stims = [stim]
-            elif not isinstance(stim, (list, tuple)):
-                raise TypeError(f"stim={stim!r}")
-            else:
-                stims = stim
-                self._stim_sequence = True
-            stim_dims = []
-            for x in stims:
-                if x.ndim == 1:
-                    stim_dims.append(())
-                elif x.ndim == 2:
-                    dim, _ = x.get_dims((None, 'time'))
-                    stim_dims.append(dim)
-                else:
-                    raise ValueError(f"stim={stim}: stimulus with more than 2 dimensions")
-            self._stim_dims = tuple(stim_dims)
+            self._stim_dims = stim_dims
         elif meg_time.tstep != self.tstep:
             raise ValueError(f"meg={meg!r}: incompatible time-step with previously added data")
         else:
-            stims = stim if self._stim_sequence else [stim]
             # check stimuli dimensions
-            if len(stims) != len(self._stim_dims):
-                raise ValueError(f"stim={stim!r}: different number of stimuli from previously added data")
-            for dim, x in zip(self._stim_dims, stims):
-                if dim is None:
-                    assert x.dimnames == ('time',)
-                else:
-                    x_dim, _ = x.get_dims((None, 'time'))
-                    if x_dim != dim:
-                        raise ValueError(f"stim={stim!r}: dimension {dim} incompatible with previously added data")
-
-        # check stimuli time axis
-        for x in stims:
-            if x.get_dim('time') != meg_time:
-                raise ValueError(f"stim={stim!r}: time axis incompatible with meg")
+            if stim_dims != self._stim_dims:
+                raise ValueError(f"stim={stim!r}: dimensions incompatible with previously added data")
 
         # add meg data
         y = meg.get_data(('sensor', 'time'))
@@ -825,7 +815,7 @@ class DstRF:
         -------
             NDVar (TRFs)
         """
-        n_predictor_variables = len(self._stim_dims[0])
+        n_predictor_variables = len(len(dim) if dim else 1 for dim in self._stim_dims)
         if n_predictor_variables > 1:
             shape = (self.theta.shape[0], n_predictor_variables, -1)
             trf = self.theta.reshape(shape)
@@ -837,17 +827,26 @@ class DstRF:
         trf = np.dot(trf, self._basis.T)
 
         time = UTS(self.tstart, self.tstep, trf.shape[-1])
-
         if self.space:
-            dims = (self.source, self.space, time)
-            dims = (self._stim_dims + dims)
-            shape = (n_predictor_variables, len(self.source), len(self.space), trf.shape[-1])
-            trf = trf.reshape(shape)
+            shared_dims = (self.source, self.space, time)
         else:
-            dims = (self._stim_dims + (self.source, time))
+            shared_dims = (self.source, time)
+        trf = trf.reshape((-1, *(map(len, shared_dims))))
 
-        trf = NDVar(trf, dims)
-        return trf
+        h = []
+        i = 0
+        for dim in self._stim_dims:
+            if dim:
+                dims = (dim, *shared_dims)
+                i1 = i + len(dim)
+                x = trf[i: i1]
+                i = i1
+            else:
+                dims = shared_dims
+                x = trf[i]
+                i += 1
+            h.append(NDVar(x, dims))
+        return h
 
     @staticmethod
     def _residual(theta0, theta1):
