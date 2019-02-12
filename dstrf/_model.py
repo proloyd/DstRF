@@ -11,6 +11,7 @@ from tqdm import tqdm
 
 # eelbrain imports
 from eelbrain import UTS, NDVar, combine, Case
+from eelbrain._utils import LazyProperty
 
 from ._fastac import Fasta
 from ._crossvalidation import crossvalidate
@@ -808,13 +809,9 @@ class DstRF:
 
         return v / len(data)
 
-    def get_strf(self):
-        """Returns the learned spatio-temporal response function as NDVar
-
-        Returns
-        -------
-            NDVar (TRFs)
-        """
+    @LazyProperty
+    def h(self):
+        """The spatio-temporal response function as (list of) NDVar"""
         n_predictor_variables = len(len(dim) if dim else 1 for dim in self._stim_dims)
         if n_predictor_variables > 1:
             shape = (self.theta.shape[0], n_predictor_variables, -1)
