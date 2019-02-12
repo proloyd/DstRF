@@ -93,26 +93,30 @@ def proxg_group_opt(z, mu):
     return z
 
 
-def covariate_from_stim(stim, M):
+def covariate_from_stim(stims, M):
     """Form covariate matrix from stimulus
 
     parameters
     ----------
-    stim: NDVar
-        predictor variables
-    M: int
+    stims : list of NDVar
+        Predictor variables.
+    M :int
         order of filter
 
     returns
     -------
-        ndarray (covariate matrix)
+    x : ndarray
+        Covariate matrix.
     """
-    if stim.has_case:
-        w = stim.get_data(('case', 'time'))
-    else:
-        w = stim.get_data('time')
-        if w.ndim == 1:
-            w = w[np.newaxis, :]
+    ws = []
+    for stim in stims:
+        if stim.ndim == 1:
+            w = stim.get_data((np.newaxis, 'time'))
+        else:
+            dimnames = stim.get_dimnames(last='time')
+            w = stim.get_data(dimnames)
+        ws.append(w)
+    w = ws[0] if len(ws) == 1 else np.concatenate(ws, 0)
 
     length = w.shape[1]
     Y = []
@@ -229,8 +233,9 @@ class REG_Data:
         self.filter_length = None
         self.basis = None
         self._norm_factor = None
-        self._stim_sequence = None
+        self._stim_is_single = None
         self._stim_dims = None
+        self._stim_names = None
         self.sensor_dim = None
 
     def add_data(self, meg, stim):
@@ -250,26 +255,24 @@ class REG_Data:
         elif meg.get_dim('sensor') != self.sensor_dim:
             raise NotImplementedError('combining data segments with different sensors is not supported')
 
+        # check stim dimensions
         meg_time = meg.get_dim('time')
-        if self._stim_sequence is None:
-            self._stim_sequence = not isinstance(stim, NDVar)
-        elif self._stim_sequence == isinstance(stim, NDVar):
-            raise TypeError(f"stim={stim!r}: Incompatible with previously added stimulus")
-        stims = stim if self._stim_sequence else [stim]
+        if self._stim_is_single is None:
+            self._stim_is_single = isinstance(stim, NDVar)
+        elif isinstance(stim, NDVar) != self._stim_is_single:
+            raise TypeError(f"{stim!r}")
+        stims = (stim,) if self._stim_is_single else stim
         stim_dims = []
         for x in stims:
-            # check stimuli time axis
             if x.get_dim('time') != meg_time:
                 raise ValueError(f"stim={stim!r}: time axis incompatible with meg")
-
-            if x.ndim == 1:
+            elif x.ndim == 1:
                 stim_dims.append(None)
             elif x.ndim == 2:
                 dim, _ = x.get_dims((None, 'time'))
                 stim_dims.append(dim)
             else:
                 raise ValueError(f"stim={stim}: stimulus with more than 2 dimensions")
-        stim_dims = tuple(stim_dims)
 
         if self.tstep is None:
             # initialize time axis
@@ -282,6 +285,7 @@ class REG_Data:
             self.basis = gaussian_basis(int(round((self.filter_length-1)/self.nlevel)), x)
             # stimuli
             self._stim_dims = stim_dims
+            self._stim_names = [x.name for x in stims]
         elif meg_time.tstep != self.tstep:
             raise ValueError(f"meg={meg!r}: incompatible time-step with previously added data")
         else:
@@ -298,7 +302,7 @@ class REG_Data:
             self._norm_factor = sqrt(y.shape[1])
 
         # add corresponding covariate matrix
-        covariates = np.dot(covariate_from_stim(stim, self.filter_length),
+        covariates = np.dot(covariate_from_stim(stims, self.filter_length),
                             self.basis) / sqrt(y.shape[1])  # Mind the normalization
         if covariates.ndim > 2:
             self._n_predictor_variables = covariates.shape[0]
@@ -346,10 +350,8 @@ class REG_Data:
         """
         obj = type(self).__new__(self.__class__)
         # take care of the copied values from the old_obj
-        copy_keys = ['_n_predictor_variables', 'basis', 'filter_length', 'tstart', 'tstep', 'tstop',
-                     '_stim_dims', '_stim_sequence', '_prewhitened']
-        for key in copy_keys:
-            obj.__dict__.update({key: self.__dict__.get(key, None)})
+        copy_keys = ['_n_predictor_variables', 'basis', 'filter_length', 'tstart', 'tstep', 'tstop', '_stim_is_single', '_stim_dims', '_stim_names', '_prewhitened']
+        obj.__dict__.update({key: self.__dict__[key] for key in copy_keys})
         # keep track of the normalization
         obj._norm_factor = sqrt(len(idx))
         # add splitted data
@@ -399,13 +401,15 @@ class DstRF:
         2. Call :meth:`REG_Data.add_data` once for each contiguous segment of MEG
            data
         3. Call :meth:`DstRF.fit` with REG_Data instance to estimate the cortical TRFs.
-        4. Call :meth:`get_strf` to retrieve the cortical TRFs.
+        4. Access the cortical TRFs in :attr:`DstRF.h`.
     """
     _name = 'cTRFs estimator'
     _cv_info = None
     _crossvalidated = False
     # Attributes to be assigned after fit:
+    _stim_is_single = None
     _stim_dims = None
+    _stim_names = None
     _basis = None
     tstart = None
     tstep = None
@@ -455,7 +459,7 @@ class DstRF:
             obj.__dict__.update({key: self.__dict__.get(key, None)})
         return obj
 
-    _PICKLE_ATTRS = ('_basis', '_cv_info', '_name', '_stim_dims', 'source', 'space', 'theta', 'tstart', 'tstep', 'tstop')
+    _PICKLE_ATTRS = ('_basis', '_cv_info', '_name', '_stim_is_single', '_stim_dims', '_stim_names', 'source', 'space', 'theta', 'tstart', 'tstep', 'tstop')
 
     def __getstate__(self):
         return {k: getattr(self, k) for k in self._PICKLE_ATTRS}
@@ -698,12 +702,13 @@ class DstRF:
                 print("objective value after champ:{:10f}\n "
                       "%% change:{:2f}".format(self.objective_vals[-1], self.err[-1]*100))
 
+        self._stim_is_single = data._stim_is_single
         self._stim_dims = data._stim_dims
+        self._stim_names = data._stim_names
         self._basis = data.basis
         self.tstart = data.tstart
         self.tstep = data.tstep
         self.tstop = data.tstop
-        return self
 
     def _construct_f(self, data,):
         """creates instances of objective function and its gradient to be passes to the FASTA algorithm
@@ -812,9 +817,9 @@ class DstRF:
     @LazyProperty
     def h(self):
         """The spatio-temporal response function as (list of) NDVar"""
-        n_predictor_variables = len(len(dim) if dim else 1 for dim in self._stim_dims)
-        if n_predictor_variables > 1:
-            shape = (self.theta.shape[0], n_predictor_variables, -1)
+        n_vars = sum(len(dim) if dim else 1 for dim in self._stim_dims)
+        if n_vars > 1:
+            shape = (self.theta.shape[0], n_vars, -1)
             trf = self.theta.reshape(shape)
             trf = trf.swapaxes(1, 0)
         else:
@@ -832,7 +837,7 @@ class DstRF:
 
         h = []
         i = 0
-        for dim in self._stim_dims:
+        for dim, name in zip(self._stim_dims, self._stim_names):
             if dim:
                 dims = (dim, *shared_dims)
                 i1 = i + len(dim)
@@ -842,8 +847,12 @@ class DstRF:
                 dims = shared_dims
                 x = trf[i]
                 i += 1
-            h.append(NDVar(x, dims))
-        return h
+            h.append(NDVar(x, dims, name=name))
+
+        if self._stim_is_single:
+            return h[0]
+        else:
+            return h
 
     @staticmethod
     def _residual(theta0, theta1):
@@ -916,7 +925,6 @@ class DstRF:
             ll = []
             ll1 = []
             ll2 = []
-            thetas = []
             for model_, (train, test) in zip(models_, kf.split(data.meg[0][0])):
                 traindata = data.timeslice(train)
                 testdata = data.timeslice(test)
@@ -924,7 +932,6 @@ class DstRF:
                 ll.append(model_.eval_cv(testdata))
                 ll1.append(model_.eval_obj(testdata))
                 ll2.append(model_.eval_cv1(testdata))
-                thetas.append(model_.get_strf())
 
             time.sleep(0.001)
             # val1 = np.array(ll).mean()
