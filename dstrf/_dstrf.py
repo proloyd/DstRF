@@ -1,7 +1,9 @@
 from collections import Sequence
 
 from eelbrain import NDVar, combine
+from mne import Covariance
 import numpy as np
+
 from ._model import DstRF, REG_Data
 
 
@@ -12,7 +14,6 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
           n_iter=10, n_iterc=10, n_iterf=100, normalize=None, in_place=None,
           mu='auto', tol=1e-3, verbose=False, n_splits=3, n_workers=None,
           use_ES=False, **kwargs):
-
     """One shot function for cortical TRF localization
 
     Estimate both TRFs and source variance from the observed MEG data by solving
@@ -31,8 +32,9 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         One or multiple predictors corresponding to each item in ``meg``.
     lead_field : NDVar
         forward solution a.k.a. lead_field matrix.
-    noise : NDVar or ndarray
-        empty room data as NDVar or the covariance matrix as an ndarray.
+    noise : mne.Covariance | NDVar | ndarray
+        Empty room data as NDVar or the covariance matrix as an :class:
+        `mne.Covaraince` object or :class:`numpy.ndarray`.
     tstart : float
         Start of the TRF in seconds.
     tstop : float
@@ -82,20 +84,8 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     model : DstRF
         The full model
     """
-    # noise covariance
-    if isinstance(noise, NDVar):
-        er = noise.get_data(('sensor', 'time'))
-        noise_cov = np.dot(er, er.T) / er.shape[1]
-    elif isinstance(noise, np.ndarray):
-        if (noise.ndim == 2) and (noise.shape[0] == noise.shape[0]):
-            noise_cov = noise
-        else:
-            raise ValueError(f'For noise as ndarray, noise dim1={noise.shape[0]} should'
-                             f'match dim2={noise.shape[0]}')
-    else:
-        raise NotImplementedError
-
-    if normalize is True:  # normalize=True defaults to 'l2'
+    # normalize=True defaults to 'l2'
+    if normalize is True:
         normalize = 'l2'
     elif isinstance(normalize, str):
         if normalize not in ('l1', 'l2'):
@@ -103,16 +93,12 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     else:
         raise TypeError(f"normalize={normalize!r}, need bool or str")
 
-    # Initialize `REG_Data` instance with desired properties
-    ds = REG_Data(tstart, tstop, nlevels)
-
     # data copy?
-    if in_place is None:
-        in_place = False
     if not isinstance(in_place, bool):
         raise TypeError(f"in_place={in_place!r}, need bool or None")
 
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
+    ds = REG_Data(tstart, tstop, nlevels)
     for r, ss in iter_data(meg, stim):
         if normalize:
             if not in_place:
@@ -127,6 +113,35 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
                     raise RuntimeError(f"normalize={normalize!r}")
                 s /= s_scale
         ds.add_data(r, ss)
+
+    # noise covariance
+    if isinstance(noise, NDVar):
+        er = noise.get_data(('sensor', 'time'))
+        noise_cov = np.dot(er, er.T) / er.shape[1]
+    elif isinstance(noise, Covariance):
+        # check for channel mismatch
+        chs_noise = set(noise.ch_names)
+        chs_data = set(ds.sensor_dim.names)
+        chs_both = sorted(chs_noise.intersection(chs_data))
+        if len(chs_both) < len(chs_data):
+            missing = sorted(chs_data.difference(chs_noise))
+            raise NotImplementedError(f"Noise covariance is missing data for sensors {', '.join(missing)}")
+        else:
+            assert np.all(ds.sensor_dim.names == chs_both)
+        if len(chs_both) < len(chs_noise):
+            index = np.array([noise.ch_names.index(ch) for ch in chs_both])
+            noise_cov = noise.data[index[:, np.newaxis], index]
+        else:
+            assert noise.ch_names == chs_both
+            noise_cov = noise.data
+    elif isinstance(noise, np.ndarray):
+        if (noise.ndim == 2) and (noise.shape[0] == noise.shape[0]):
+            noise_cov = noise
+        else:
+            raise ValueError(f'For noise as ndarray, noise dim1={noise.shape[0]} should'
+                             f'match dim2={noise.shape[0]}')
+    else:
+        raise NotImplementedError
 
     # Regularizer Choice
     if isinstance(mu, (tuple, list, np.ndarray)):
