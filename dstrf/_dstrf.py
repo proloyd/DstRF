@@ -113,19 +113,20 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         raise TypeError(f"in_place={in_place!r}, need bool or None")
 
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
-    for r, s in iter_data(meg, stim):
+    for r, ss in iter_data(meg, stim):
         if normalize:
             if not in_place:
-                s = s.copy()
-            s -= s.mean('time')
-            if normalize == 'l2':
-                s_scale = (s ** 2).mean('time') ** 0.5
-            elif normalize == 'l1':
-                s_scale = s.abs().mean('time')
-            else:
-                raise RuntimeError(f"normalize={normalize!r}")
-            s /= s_scale
-        ds.add_data(r, s)
+                ss = [s.copy() for s in ss]
+            for s in ss:
+                s -= s.mean('time')
+                if normalize == 'l2':
+                    s_scale = (s ** 2).mean('time') ** 0.5
+                elif normalize == 'l1':
+                    s_scale = s.abs().mean('time')
+                else:
+                    raise RuntimeError(f"normalize={normalize!r}")
+                s /= s_scale
+        ds.add_data(r, ss)
 
     # Regularizer Choice
     if isinstance(mu, (tuple, list, np.ndarray)):
@@ -173,12 +174,14 @@ def iter_data(meg, stim):
                 # single stim
                 assert stim.has_case and len(stim) == len(meg)
                 for meg_trial, stim_trial in zip(meg, stim):
-                    yield meg_trial, stim_trial
+                    yield meg_trial, (stim_trial,)
             else:
                 # sequence stim
                 assert all(s.has_case for s in stim)
                 assert all(len(s) == len(meg) for s in stim)
                 for meg_trial, *stims_trial in zip(meg, *stim):
                     yield meg_trial, stims_trial
+        elif isinstance(stim, NDVar):
+            yield meg, (stim,)
         else:
             yield meg, stim
