@@ -125,45 +125,12 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     mp_worker(fun, job_q, result_q, n_workers)
     prog.join()
 
-    # numresults = 0
-    # resultdict = {}
-    # n_attempts = 0
-    # while True:
-    #     try:
-    #         outdict = result_q.get(False)  # no wait
-    #         # if outdict is None:
-    #         #     prog.close()
-    #         #     break
-    #         resultdict.update(outdict)
-    #         # prog.n += len(outdict)
-    #         prog.update(n=len(outdict))
-    #         time.sleep(0.01)
-    #         numresults = len(resultdict)
-    #         if numresults == len(mus):
-    #             prog.close()
-    #             break
-    #         print('Received %i objects, waiting for %s more' % (numresults, len(mus) - numresults))
-    #     except queue.Empty:
-    #         time.sleep(10)
-    #         prog.update(n=0)
-    #         # print('Sleeping for 10s')
-    #     except EOFError:
-    #         print('Opps! EOFError encountered.')
-    #         n_attempts += 1
-    #         print('Retrying %i th time' % n_attempts)
-    #         if n_attempts > 100:
-    #             break
-    #
-    # if numresults < len(mus):
-    #     warnings.warn('%i objects are missing' % (len(mus) - numresults), )
-    #
-    # cvmu, esmu, cv_info = format_to_array(resultdict)
-
     cvmu, esmu, cv_info = result_q.get()
 
-    # print('Crossvalidation Done.')
+    if cv_info[-1] is not None:
+        warnings.warn(cv_info[-1])
     print('Building cross-validated model with mu %f' % cvmu)
-    
+
     return cvmu, esmu, cv_info
 
 
