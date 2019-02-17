@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 def naive_worker(fun, job_q, result_q):
     """Worker function"""
-    myname = current_process().name
+    # myname = current_process().name
     while True:
         try:
             job = job_q.get_nowait()
@@ -62,11 +62,9 @@ class collect_output(Process):
                 prog.update(n=len(outdict))
                 time.sleep(0.01)
                 numresults = len(resultdict)
-                # print('Received %i objects, waiting for %s more' % (numresults, self.N - numresults))
             except queue.Empty:
                 time.sleep(10)
                 prog.update(n=0)
-                # print('Sleeping for 10s')
             except EOFError:
                 print('Opps! EOFError encountered.')
                 n_attempts += 1
@@ -119,7 +117,6 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     job_q = Queue()
     result_q = Queue()
 
-    # print('Putting job into queue')
     for mu in mus:
         job_q.put([mu])  # put the job as a list.
 
@@ -233,11 +230,9 @@ class TimeSeriesSplit:
 
     def _iter_part_masks(self, X):
         n_v = ceil(self.ratio / (1 + self.ratio) * len(X))
-        # print(n_v)
         for i in range(self.p, 0, -1):
             test_mask = np.zeros(len(X), dtype=np.bool)
             train_mask = np.ones(len(X), dtype=np.bool)
-            # print(i*n_v-self.d)
             train_mask[-(i*n_v+self.d):] = False
             if i == 1:
                 test_mask[-i*n_v:] = True
