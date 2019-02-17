@@ -943,7 +943,7 @@ class DstRF:
 
         return cvfunc
 
-    def _auto_mu(self, data, p=95.0):
+    def _auto_mu(self, data, p=99.0):
         self._set_mu(0.0, data)
         _, grad_funct = self._construct_f(data)
         if self.space:
