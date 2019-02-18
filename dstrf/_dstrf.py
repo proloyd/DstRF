@@ -100,7 +100,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         raise TypeError(f"in_place={in_place!r}, need bool or None")
 
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
-    for r, s in iter(meg, stim):
+    for r, s in iter_data(meg, stim):
         if not in_place:
             s = s.copy()
             r = r.copy()
@@ -151,13 +151,10 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
 
     model = DstRF(lead_field, noise_cov, n_iter=n_iter, n_iterc=n_iterc, n_iterf=n_iterf)
     model.fit(ds, mu, do_crossvalidation, tol, verbose, mus=mus, n_splits=n_splits, n_workers=n_workers)
-
-    trf = model.get_strf(ds)
-
-    return trf, model
+    return model
 
 
-def iter(meg, stim):
+def iter_data(meg, stim):
     if isinstance(meg, list):
         if isinstance(stim, list):
             if isinstance(stim[0], NDVar):

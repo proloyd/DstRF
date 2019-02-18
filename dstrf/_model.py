@@ -407,11 +407,17 @@ class DstRF:
         2. Call :meth:`REG_Data.add_data` once for each contiguous segment of MEG
            data
         3. Call :meth:`DstRF.fit` with REG_Data instance to estimate the cortical TRFs.
-        4. Call :meth:`get_strf` with REG_Data instance to retrieve the cortical TRFs.
+        4. Call :meth:`get_strf` to retrieve the cortical TRFs.
     """
     _name = 'cTRFs estimator'
     _cv_info = None
     _crossvalidated = False
+    # Attributes to be assigned after fit:
+    _stim_dims = None
+    _basis = None
+    tstart = None
+    tstep = None
+    tstop = None
 
     def __init__(self, lead_field, noise_covariance, n_iter=30, n_iterc=10, n_iterf=100):
         if lead_field.has_dim('space'):
@@ -456,6 +462,15 @@ class DstRF:
         for key in copy_keys:
             obj.__dict__.update({key: self.__dict__.get(key, None)})
         return obj
+
+    _PICKLE_ATTRS = ('_basis', '_cv_info', '_name', '_stim_dims', 'source', 'space', 'theta', 'tstart', 'tstep', 'tstop')
+
+    def __getstate__(self):
+        return {k: getattr(self, k) for k in self._PICKLE_ATTRS}
+
+    def __setstate__(self, state):
+        for k in self._PICKLE_ATTRS:
+            setattr(self, k, state[k])
 
     def _prewhiten(self):
         wf = _inv_sqrtm(self.noise_covariance)
@@ -679,6 +694,11 @@ class DstRF:
             end = time.time()
             print("Time elapsed: {:10f} s".format(end - start))
 
+        self._stim_dims = data._stim_dims
+        self._basis = data.basis
+        self.tstart = data.tstart
+        self.tstep = data.tstep
+        self.tstop = data.tstop
         return self
 
     def _construct_f(self, data,):
@@ -785,38 +805,33 @@ class DstRF:
 
         return v / len(data)
 
-    def get_strf(self, data):
+    def get_strf(self):
         """Returns the learned spatio-temporal response function as NDVar
-
-        Parameters
-        ---------
-        data : REG_Data instance
 
         Returns
         -------
             NDVar (TRFs)
         """
-        trf = self.theta.copy()
-        n_predictor_variables = len(data._stim_dims[0])
+        n_predictor_variables = len(self._stim_dims[0])
         if n_predictor_variables > 1:
-            shape = (trf.shape[0], n_predictor_variables, -1)
-            trf.shape = shape
+            shape = (self.theta.shape[0], n_predictor_variables, -1)
+            trf = self.theta.reshape(shape)
             trf = trf.swapaxes(1, 0)
         else:
-            trf = trf[np.newaxis, :]
+            trf = self.theta[np.newaxis, :]
 
         # trf = np.tensordot(trf, data.basis.T, axes=1)
-        trf = np.dot(trf, data.basis.T)
+        trf = np.dot(trf, self._basis.T)
 
-        time = UTS(data.tstart, data.tstep, trf.shape[-1])
+        time = UTS(self.tstart, self.tstep, trf.shape[-1])
 
         if self.space:
             dims = (self.source, self.space, time)
-            dims = (data._stim_dims + dims)
+            dims = (self._stim_dims + dims)
             shape = (n_predictor_variables, len(self.source), len(self.space), trf.shape[-1])
             trf = trf.reshape(shape)
         else:
-            dims = (data._stim_dims + (self.source, time))
+            dims = (self._stim_dims + (self.source, time))
 
         trf = NDVar(trf, dims)
         return trf
@@ -900,7 +915,7 @@ class DstRF:
                 ll.append(model_.eval_cv(testdata))
                 ll1.append(model_.eval_obj(testdata))
                 ll2.append(model_.eval_cv1(testdata))
-                thetas.append(model_.get_strf(data))
+                thetas.append(model_.get_strf())
 
             time.sleep(0.001)
             # val1 = np.array(ll).mean()
