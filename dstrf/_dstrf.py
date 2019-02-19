@@ -83,6 +83,35 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         TRF estimate
     model : DstRF
         The full model
+
+    Examples
+    --------
+    MEG data ``y`` with dimensions (case, sensor, time) and predictor ``x``
+    with dimensions (case, time)::
+
+        dstrf(y, x, fwd, cov)
+
+    ``x`` can always also have an additional predictor dimension, for example,
+    if ``x`` represents a spectrogram: (case, frequency, time). The case
+    dimension is optional, i.e. a single contiguous data segment is also
+    accepted, but the case dimension should always match between ``y`` and
+    ``x``.
+
+    Multiple distinct predictor variables can be supplied as list; e.g., when
+    modeling simultaneous responses to an attended and an unattended stimulus
+    with ``x_attended`` and ``x_unattended``::
+
+        dstrf(y, [x_attended, x_unattended], fwd, cov)
+
+    Multiple data segments can also be specified as list. E.g., if ``y1`` and
+    ``y2`` are responses to stimuli ``x1`` and ``x2``, respoectively::
+
+        dstrf([y1, y2], [x1, x2], fwd, cov)
+
+    And with multiple predictors::
+
+        dstrf([y1, y2], [[x1_attended, x1_unattended], [x2_attended, x2_unattended]], fwd, cov)
+
     """
     # normalize=True defaults to 'l2'
     if normalize is True:
