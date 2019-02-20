@@ -171,7 +171,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         else:
             raise ValueError(f'noise = array of shape {noise.shape}; should be {(n, n)}')
     else:
-        raise NotImplementedError
+        raise TypeError(f'noise={noise!r}')
 
     # Regularizer Choice
     if isinstance(mu, (tuple, list, np.ndarray)):
