@@ -143,6 +143,8 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
                     raise RuntimeError(f"normalize={normalize!r}")
                 s /= s_scale
         ds.add_data(r, ss)
+    # TODO: make this less hacky when fixing normalization (iter_data() always turns stim into lists)
+    ds._stim_is_single = isinstance(stim, NDVar) if isinstance(meg, NDVar) else isinstance(stim[0], NDVar)
 
     # noise covariance
     if isinstance(noise, NDVar):
@@ -198,7 +200,6 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     model.fit(ds, mu, do_crossvalidation, tol, verbose, mus=mus, n_splits=n_splits,
               n_workers=n_workers, use_ES=use_ES, ** kwargs)
     return model
-
 
 
 def iter_data(meg, stim):
