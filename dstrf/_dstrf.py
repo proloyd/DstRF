@@ -25,10 +25,11 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
 
     Parameters
     ----------
-    meg :  NDVar (case, sensor, time) or list of such NDVars
-        where case reflects different trials, different list elements reflects
-        different conditions (i.e. stimulus).
-    stim : NDVar ([case, dim], time) or (nested) list of such NDVars
+    meg :  NDVar ([case,] sensor, time) or list of such NDVars
+        If multiple trials are the same length they can be specified as
+        :class:`NDVar` with case dimension, if they are different length they
+        can be supplied as list.
+    stim : NDVar ([case, dim,] time) or (nested) list of such NDVars
         One or multiple predictors corresponding to each item in ``meg``.
     lead_field : NDVar
         forward solution a.k.a. lead_field matrix.
