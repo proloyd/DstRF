@@ -10,6 +10,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
           n_iter=10, n_iterc=10, n_iterf=100, normalize=None, in_place=None,
           mu='auto', tol=1e-3, verbose=False, n_splits=3, n_workers=None,
           use_ES=False, **kwargs):
+
     """One shot function for cortical TRF localization
 
     Estimate both TRFs and source variance from the observed MEG data by solving
@@ -158,6 +159,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     model.fit(ds, mu, do_crossvalidation, tol, verbose, mus=mus, n_splits=n_splits,
               n_workers=n_workers, use_ES=use_ES, ** kwargs)
     return model
+
 
 
 def iter_data(meg, stim):

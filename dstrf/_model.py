@@ -746,7 +746,7 @@ class DstRF:
 
         def funct(x):
             fval = 0.0
-            for i in range(len((data))):
+            for i in range(len(data)):
                 fval += f(leadfields[i], x, bbts[i], bEs[i], data._EtE[i])
             return fval
 
