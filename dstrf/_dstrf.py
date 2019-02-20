@@ -34,8 +34,8 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     lead_field : NDVar
         forward solution a.k.a. lead_field matrix.
     noise : mne.Covariance | NDVar | ndarray
-        Empty room data as NDVar or the covariance matrix as an :class:
-        `mne.Covaraince` object or :class:`numpy.ndarray`.
+        The empty room noise covariance, or data from which to compute it as
+        :class:`NDVar`.
     tstart : float
         Start of the TRF in seconds.
     tstop : float
@@ -165,11 +165,11 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
             assert noise.ch_names == chs_both
             noise_cov = noise.data
     elif isinstance(noise, np.ndarray):
-        if (noise.ndim == 2) and (noise.shape[0] == noise.shape[0]):
+        n = len(ds.sensor_dim)
+        if noise.shape == (n, n):
             noise_cov = noise
         else:
-            raise ValueError(f'For noise as ndarray, noise dim1={noise.shape[0]} should'
-                             f'match dim2={noise.shape[0]}')
+            raise ValueError(f'noise = array of shape {noise.shape}; should be {(n, n)}')
     else:
         raise NotImplementedError
 
