@@ -594,7 +594,7 @@ class DstRF:
 
         return self
 
-    def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-4, verbose=False, use_ES=False, **kwargs):
+    def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-4, verbose=False, use_ES=False, mus=None, n_splits=None, n_workers=None, debug=False):
         """cTRF estimator implementation
 
         Estimate both TRFs and source variance from the observed MEG data by solving
@@ -629,11 +629,12 @@ class DstRF:
             k value used in k-fold cross-validation
         n_workers : int
             number of workers to be used for cross-validation
+        debug : bool
+            Print debugging information.
 
         ..[1] Lim, Chinghway, and Bin Yu. "Estimation stability with cross-validation (ESCV)."
         Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
         """
-        debug = kwargs.get('debug', False)
         # pre-whiten the object itself
         if self._whitening_filter is None:
             self._prewhiten()
@@ -643,11 +644,8 @@ class DstRF:
 
         # take care of cross-validation
         if do_crossvalidation:
-            mus = kwargs.get('mus', None)
             if mus == 'auto':
                 mus = self._auto_mu(data)
-            n_splits = kwargs.get('n_splits', None)
-            n_workers = kwargs.get('n_workers', None)
             cvmu, esmu, cv_info = crossvalidate(self, data, mus, n_splits, n_workers)
             self._cv_info = cv_info
             self._crossvalidated = True
@@ -696,7 +694,7 @@ class DstRF:
             if self.err[-1] < tol:
                 break
 
-            self._solve(data, theta, **kwargs)
+            self._solve(data, theta)
 
             if verbose:
                 self.objective_vals.append(self.eval_obj(data))
