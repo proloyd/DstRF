@@ -100,8 +100,8 @@ def covariate_from_stim(stims, M):
     ----------
     stims : list of NDVar
         Predictor variables.
-    M :int
-        order of filter
+    M : int
+        Order of filter.
 
     returns
     -------
@@ -509,20 +509,23 @@ class DstRF:
         self._solve(data, self.theta, n_iterc=30)
         return self
 
-    def _solve(self, data, theta, **kwargs):
+    def _solve(self, data, theta, idx=slice(None, None), n_iterc=None):
         """Champagne steps implementation
 
-        Implementation details can be found at:
-        D. P. Wipf, J. P. Owen, H. T. Attias, K. Sekihara, and S. S. Nagarajan,
-        “Robust Bayesian estimation of the location, orientation, and time course
-        of multiple correlated neural sources using MEG,” NeuroImage, vol. 49,
-        no. 1, pp. 641–655, 2010
         Parameters
         ----------
         data : REG_Data
             regression data to fit.
         theta : ndarray
             co-effecients of the TRFs over Gabor atoms.
+
+        Notes
+        -----
+        Implementation details can be found at:
+        D. P. Wipf, J. P. Owen, H. T. Attias, K. Sekihara, and S. S. Nagarajan,
+        “Robust Bayesian estimation of the location, orientation, and time course
+        of multiple correlated neural sources using MEG,” NeuroImage, vol. 49,
+        no. 1, pp. 641–655, 2010
         """
         # Choose dc
         if self.space:
@@ -530,9 +533,8 @@ class DstRF:
         else:
             dc = 1
 
-        idx = kwargs.get('idx', slice(None, None))
-
-        n_iterc = kwargs.get('n_iterc', self.n_iterc)
+        if n_iterc is None:
+            n_iterc = self.n_iterc
 
         for key, (meg, covariates) in enumerate(data):
             meg = meg[idx]
@@ -710,12 +712,14 @@ class DstRF:
         self.tstep = data.tstep
         self.tstop = data.tstop
 
-    def _construct_f(self, data,):
+    def _construct_f(self, data):
         """creates instances of objective function and its gradient to be passes to the FASTA algorithm
 
         Parameters
         ---------
-            data: REG_Data instance"""
+        data : REG_Data
+            Data.
+        """
         leadfields = []
         bEs = []
         bbts = []
@@ -759,7 +763,8 @@ class DstRF:
 
         Parameters
         ---------
-        data : REG_Data instance
+        data : REG_Data
+            Data.
 
         Returns
         -------
