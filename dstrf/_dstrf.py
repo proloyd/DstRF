@@ -161,7 +161,6 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     return model
 
 
-
 def iter_data(meg, stim):
     if isinstance(meg, list):
         if isinstance(stim, list):
@@ -197,3 +196,39 @@ def iter_data(meg, stim):
                              f'or list of NDVars')
     else:
         raise ValueError(f'Invalid data format {meg}: Expected NDVar or list of NDVars')
+
+
+def scale_stim(meg, stim, normalize):
+    if isinstance(meg, list):
+        temp = []
+        for stim_ in stim:
+            temp.append(get_scaling(stim_, normalize))
+        temp = np.array(temp)
+        if normalize == 'l1':
+            scaling = temp.sum(axis=-1)
+        else:
+            scaling = (temp ** 2).sum(axis=-1) ** 0.5
+    else:
+        scaling = get_scaling(stim, normalize)
+
+    return scaling
+
+
+def get_scaling(stim, normalize):
+    if isinstance(stim, NDVar):
+        stim = [stim, ]
+    scaling = np.zeros(len(stim))
+    for i, stim_ in enumerate(stim):
+        if normalize == 'l1':
+            temp = stim_.abs().mean('time')
+            if temp.has_case:
+                scaling[i] = temp.mean('case')
+            else:
+                scaling[i] = temp
+        else:
+            temp = (stim_ ** 2).mean('time')
+            if temp.has_case:
+                scaling[i] = temp.mean('case') ** 0.5
+            else:
+                scaling[i] = temp ** 0.5
+    return scaling
