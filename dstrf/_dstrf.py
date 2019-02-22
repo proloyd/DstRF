@@ -1,5 +1,9 @@
+from collections import Sequence
+
 from eelbrain import NDVar, combine
+from mne import Covariance
 import numpy as np
+
 from ._model import DstRF, REG_Data
 
 
@@ -10,7 +14,6 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
           n_iter=10, n_iterc=10, n_iterf=100, normalize=None, in_place=None,
           mu='auto', tol=1e-3, verbose=False, n_splits=3, n_workers=None,
           use_ES=False, **kwargs):
-
     """One shot function for cortical TRF localization
 
     Estimate both TRFs and source variance from the observed MEG data by solving
@@ -22,18 +25,17 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
 
     Parameters
     ----------
-    meg :  NDVar (case, sensor, time) or list of such NDVars
-        where case reflects different trials, different list elements reflects
-        different conditions (i.e. stimulus).
-    stim : NDVar (case, time) or list of such NDVars
-        where case reflects different trials;  different list elements reflects
-        different feature variables(e.g. envelope, wordlog10wf etc).
-        TODO: [ stim2  # NDVar  (case, scalar, time)  (e.g. spectrogram with
-         multiple bands) to be implemented]
+    meg :  NDVar ([case,] sensor, time) or list of such NDVars
+        If multiple trials are the same length they can be specified as
+        :class:`NDVar` with case dimension, if they are different length they
+        can be supplied as list.
+    stim : NDVar ([case, dim,] time) or (nested) list of such NDVars
+        One or multiple predictors corresponding to each item in ``meg``.
     lead_field : NDVar
         forward solution a.k.a. lead_field matrix.
-    noise : NDVar or ndarray
-        empty room data as NDVar or the covariance matrix as an ndarray.
+    noise : mne.Covariance | NDVar | ndarray
+        The empty room noise covariance, or data from which to compute it as
+        :class:`NDVar`.
     tstart : float
         Start of the TRF in seconds.
     tstop : float
@@ -82,57 +84,96 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         TRF estimate
     model : DstRF
         The full model
-    """
-    # noise covariance
-    if isinstance(noise, NDVar):
-        er = noise.get_data(('sensor', 'time'))
-        noise_cov = np.dot(er, er.T) / er.shape[1]
-    elif isinstance(noise, np.ndarray):
-        if (noise.ndim == 2) and (noise.shape[0] == noise.shape[0]):
-            noise_cov = noise
-        else:
-            raise ValueError(f'For noise as ndarray, noise dim1={noise.shape[0]} should'
-                             f'match dim2={noise.shape[0]}')
-    else:
-        raise NotImplementedError
 
-    # Initialize `REG_Data` instance with desired properties
-    ds = REG_Data(tstart, tstop, nlevels)
+    Examples
+    --------
+    MEG data ``y`` with dimensions (case, sensor, time) and predictor ``x``
+    with dimensions (case, time)::
+
+        dstrf(y, x, fwd, cov)
+
+    ``x`` can always also have an additional predictor dimension, for example,
+    if ``x`` represents a spectrogram: (case, frequency, time). The case
+    dimension is optional, i.e. a single contiguous data segment is also
+    accepted, but the case dimension should always match between ``y`` and
+    ``x``.
+
+    Multiple distinct predictor variables can be supplied as list; e.g., when
+    modeling simultaneous responses to an attended and an unattended stimulus
+    with ``x_attended`` and ``x_unattended``::
+
+        dstrf(y, [x_attended, x_unattended], fwd, cov)
+
+    Multiple data segments can also be specified as list. E.g., if ``y1`` and
+    ``y2`` are responses to stimuli ``x1`` and ``x2``, respoectively::
+
+        dstrf([y1, y2], [x1, x2], fwd, cov)
+
+    And with multiple predictors::
+
+        dstrf([y1, y2], [[x1_attended, x1_unattended], [x2_attended, x2_unattended]], fwd, cov)
+
+    """
+    # normalize=True defaults to 'l2'
+    if normalize is True:
+        normalize = 'l2'
+    elif isinstance(normalize, str):
+        if normalize not in ('l1', 'l2'):
+            raise ValueError(f"normalize={normalize!r}, need bool or 'l1' or 'l2'")
+    else:
+        raise TypeError(f"normalize={normalize!r}, need bool or str")
 
     # data copy?
-    if in_place is None:
-        in_place = False
     if not isinstance(in_place, bool):
         raise TypeError(f"in_place={in_place!r}, need bool or None")
 
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
-    for r, s in iter_data(meg, stim):
-        if not in_place:
-            s = s.copy()
-            r = r.copy()
-
-        if normalize:  # screens False, None
-            s -= s.mean('time')
-            if isinstance(normalize, bool):  # normalize=True defaults to 'l2'
-                normalize = 'l2'
-            if isinstance(normalize, str):
+    ds = REG_Data(tstart, tstop, nlevels)
+    for r, ss in iter_data(meg, stim):
+        if normalize:
+            if not in_place:
+                ss = [s.copy() for s in ss]
+            for s in ss:
+                s -= s.mean('time')
                 if normalize == 'l2':
-                    s_scale = (s.x ** 2).mean(-1) ** 0.5
+                    s_scale = (s ** 2).mean('time') ** 0.5
                 elif normalize == 'l1':
-                    s_scale = np.abs(s.x).mean(-1)
+                    s_scale = s.abs().mean('time')
                 else:
-                    raise ValueError(f"normalize={normalize!r}, need bool or \'l1\' or \'l2\'")
-            else:
-                raise TypeError(f"normalize={normalize!r}, need bool or str")
+                    raise RuntimeError(f"normalize={normalize!r}")
+                s /= s_scale
+        ds.add_data(r, ss)
+    # TODO: make this less hacky when fixing normalization (iter_data() always turns stim into lists)
+    ds._stim_is_single = isinstance(stim, NDVar) if isinstance(meg, NDVar) else isinstance(stim[0], NDVar)
 
-            s.x /= s_scale[:, np.newaxis]
-
-        if r.has_case:
-            dim = r.get_dim('case')
-            for i in range(len(dim)):
-                ds.add_data(r[i], s)
+    # noise covariance
+    if isinstance(noise, NDVar):
+        er = noise.get_data(('sensor', 'time'))
+        noise_cov = np.dot(er, er.T) / er.shape[1]
+    elif isinstance(noise, Covariance):
+        # check for channel mismatch
+        chs_noise = set(noise.ch_names)
+        chs_data = set(ds.sensor_dim.names)
+        chs_both = sorted(chs_noise.intersection(chs_data))
+        if len(chs_both) < len(chs_data):
+            missing = sorted(chs_data.difference(chs_noise))
+            raise NotImplementedError(f"Noise covariance is missing data for sensors {', '.join(missing)}")
         else:
-            ds.add_data(r, s)
+            assert np.all(ds.sensor_dim.names == chs_both)
+        if len(chs_both) < len(chs_noise):
+            index = np.array([noise.ch_names.index(ch) for ch in chs_both])
+            noise_cov = noise.data[index[:, np.newaxis], index]
+        else:
+            assert noise.ch_names == chs_both
+            noise_cov = noise.data
+    elif isinstance(noise, np.ndarray):
+        n = len(ds.sensor_dim)
+        if noise.shape == (n, n):
+            noise_cov = noise
+        else:
+            raise ValueError(f'noise = array of shape {noise.shape}; should be {(n, n)}')
+    else:
+        raise TypeError(f'noise={noise!r}')
 
     # Regularizer Choice
     if isinstance(mu, (tuple, list, np.ndarray)):
@@ -161,39 +202,32 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     return model
 
 
-
 def iter_data(meg, stim):
-    if isinstance(meg, list):
-        if isinstance(stim, list):
-            if isinstance(stim[0], NDVar):
-                for meg_, *stim_ in zip(meg, stim):
-                    time_dim = meg_.get_dim('time')
-                    if any(r_.get_dim('time') != time_dim for r_ in stim_):
-                        raise ValueError("Not all NDVars have the same time dimension")
-                    yield (meg_, combine(stim_))
-            else:
-                for meg_, *stim_ in zip(meg, *stim):
-                    time_dim = meg_.get_dim('time')
-                    if any(r_.get_dim('time') != time_dim for r_ in stim_):
-                        raise ValueError("Not all NDVars have the same time dimension")
-                    yield (meg_, combine(stim_))
-        else:
-            raise ValueError(f'Invalid data format {stim}: if meg is a list of NDVar'
-                             ', stim must be a list of NDVars')
-    elif isinstance(meg, NDVar):
-        time_dim = meg.get_dim('time')
-        if isinstance(stim, list):
-            for meg_, *stim_ in zip(meg, *stim):
-                if any(r_.get_dim('time') != time_dim for r_ in stim_):
-                    raise ValueError("Not all NDVars have the same time dimension")
-                yield (meg_, combine(stim_))
-        elif isinstance(stim, NDVar):
-            if stim.get_dim('time') != time_dim:
-                raise ValueError("Not all NDVars have the same time dimension")
-            for meg_, *stim_ in zip(meg, stim):
-                yield (meg_, combine(stim_))
-        else:
-            raise ValueError(f'Invalid data format {stim}: if meg is a NDVar, stim must be a NDVar'
-                             f'or list of NDVars')
+    """Iterate over data as ``meg, (stim1, ...)`` tuples"""
+    if isinstance(meg, NDVar):
+        megs = (meg,)
+        stims = (stim,)
+    elif isinstance(meg, Sequence):
+        megs = meg
+        stims = stim
     else:
-        raise ValueError(f'Invalid data format {meg}: Expected NDVar or list of NDVars')
+        raise TypeError(f"meg={meg!r}")
+
+    for meg, stim in zip(megs, stims):
+        if meg.has_case:
+            # assume stim has case too
+            if isinstance(stim, NDVar):
+                # single stim
+                assert stim.has_case and len(stim) == len(meg)
+                for meg_trial, stim_trial in zip(meg, stim):
+                    yield meg_trial, (stim_trial,)
+            else:
+                # sequence stim
+                assert all(s.has_case for s in stim)
+                assert all(len(s) == len(meg) for s in stim)
+                for meg_trial, *stims_trial in zip(meg, *stim):
+                    yield meg_trial, stims_trial
+        elif isinstance(stim, NDVar):
+            yield meg, (stim,)
+        else:
+            yield meg, stim
