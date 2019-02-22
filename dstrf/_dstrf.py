@@ -105,27 +105,26 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     if not isinstance(in_place, bool):
         raise TypeError(f"in_place={in_place!r}, need bool or None")
 
+    if normalize:  # screens False, None
+        if isinstance(normalize, bool):  # normalize=True defaults to 'l2'
+            normalize = 'l2'
+        elif isinstance(normalize, str):
+            if normalize not in ('l1', 'l2'):
+                raise ValueError(f"normalize={normalize!r}, need bool or \'l1\' or \'l2\'")
+        else:
+            raise TypeError(f"normalize={normalize!r}, need bool or str")
+        m, s_scale = get_scaling(meg, stim, normalize)
+    else:
+        m, s_scale = (0, 1)
+
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
     for r, s in iter_data(meg, stim):
         if not in_place:
             s = s.copy()
             r = r.copy()
-
-        if normalize:  # screens False, None
-            s -= s.mean('time')
-            if isinstance(normalize, bool):  # normalize=True defaults to 'l2'
-                normalize = 'l2'
-            if isinstance(normalize, str):
-                if normalize == 'l2':
-                    s_scale = (s.x ** 2).mean(-1) ** 0.5
-                elif normalize == 'l1':
-                    s_scale = np.abs(s.x).mean(-1)
-                else:
-                    raise ValueError(f"normalize={normalize!r}, need bool or \'l1\' or \'l2\'")
-            else:
-                raise TypeError(f"normalize={normalize!r}, need bool or str")
-
+            s.x -= m[:, np.newaxis]
             s.x /= s_scale[:, np.newaxis]
+            print(s.norm('time'))
 
         if r.has_case:
             dim = r.get_dim('case')
@@ -171,7 +170,7 @@ def iter_data(meg, stim):
                         raise ValueError("Not all NDVars have the same time dimension")
                     yield (meg_, combine(stim_))
             else:
-                for meg_, *stim_ in zip(meg, *stim):
+                for meg_, *stim_ in zip(meg, stim):
                     time_dim = meg_.get_dim('time')
                     if any(r_.get_dim('time') != time_dim for r_ in stim_):
                         raise ValueError("Not all NDVars have the same time dimension")
@@ -198,37 +197,44 @@ def iter_data(meg, stim):
         raise ValueError(f'Invalid data format {meg}: Expected NDVar or list of NDVars')
 
 
-def scale_stim(meg, stim, normalize):
+def get_scaling(meg, stim, normalize):
     if isinstance(meg, list):
-        temp = []
+        temp_m = []
+        temp_s = []
         for stim_ in stim:
-            temp.append(get_scaling(stim_, normalize))
-        temp = np.array(temp)
+            m, s = _get_scaling(stim_, normalize)
+            temp_m.append(m)
+            temp_s.append(s)
+        temp_m = np.array(temp_m)
+        temp_s = np.array(temp_s)
+        m = temp_m.mean(axis=-1)
         if normalize == 'l1':
-            scaling = temp.sum(axis=-1)
+            scaling = temp_s.mean(axis=-1)
         else:
-            scaling = (temp ** 2).sum(axis=-1) ** 0.5
+            scaling = (temp_s ** 2).mean(axis=-1) ** 0.5
     else:
-        scaling = get_scaling(stim, normalize)
+        m, scaling = _get_scaling(stim, normalize)
 
-    return scaling
+    return m, scaling
 
 
-def get_scaling(stim, normalize):
+def _get_scaling(stim, normalize):
     if isinstance(stim, NDVar):
         stim = [stim, ]
+    m = np.zeros(len(stim))
     scaling = np.zeros(len(stim))
     for i, stim_ in enumerate(stim):
+        m[i] = stim_.mean()
         if normalize == 'l1':
-            temp = stim_.abs().mean('time')
-            if temp.has_case:
-                scaling[i] = temp.mean('case')
+            temp = (stim_ - m[i]).abs().mean('time')
+            if stim_.has_case:
+                scaling[i] = temp.mean()
             else:
                 scaling[i] = temp
         else:
-            temp = (stim_ ** 2).mean('time')
-            if temp.has_case:
-                scaling[i] = temp.mean('case') ** 0.5
+            temp = ((stim_ - m[i]) ** 2).mean('time')
+            if stim_.has_case:
+                scaling[i] = temp.mean() ** 0.5
             else:
                 scaling[i] = temp ** 0.5
-    return scaling
+    return m, scaling
