@@ -127,21 +127,34 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     if not isinstance(in_place, bool):
         raise TypeError(f"in_place={in_place!r}, need bool or None")
 
+    if normalize:  # screens False, None
+        if isinstance(normalize, bool):  # normalize=True defaults to 'l2'
+            normalize = 'l2'
+        elif isinstance(normalize, str):
+            if normalize not in ('l1', 'l2'):
+                raise ValueError(f"normalize={normalize!r}, need bool or \'l1\' or \'l2\'")
+        else:
+            raise TypeError(f"normalize={normalize!r}, need bool or str")
+        ms, s_scale = get_scaling(meg, stim, normalize)
+    else:
+        ms, s_scale = (0, 1)
+
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
     ds = REG_Data(tstart, tstop, nlevels)
     for r, ss in iter_data(meg, stim):
         if normalize:
             if not in_place:
                 ss = [s.copy() for s in ss]
-            for s in ss:
-                s -= s.mean('time')
-                if normalize == 'l2':
-                    s_scale = (s ** 2).mean('time') ** 0.5
-                elif normalize == 'l1':
-                    s_scale = s.abs().mean('time')
-                else:
-                    raise RuntimeError(f"normalize={normalize!r}")
-                s /= s_scale
+            for s, m, scale in zip(ss, ms, s_scale):
+                s.x -= m
+                s.x /= s_scale[:, np.newaxis]
+                # if normalize == 'l2':
+                #     s_scale = (s ** 2).mean('time') ** 0.5
+                # elif normalize == 'l1':
+                #     s_scale = s.abs().mean('time')
+                # else:
+                #     raise RuntimeError(f"normalize={normalize!r}")
+                # s /= s_scale
         ds.add_data(r, ss)
     # TODO: make this less hacky when fixing normalization (iter_data() always turns stim into lists)
     ds._stim_is_single = isinstance(stim, NDVar) if isinstance(meg, NDVar) else isinstance(stim[0], NDVar)
@@ -233,37 +246,44 @@ def iter_data(meg, stim):
             yield meg, stim
 
 
-def scale_stim(meg, stim, normalize):
+def get_scaling(meg, stim, normalize):
     if isinstance(meg, list):
-        temp = []
+        temp_m = []
+        temp_s = []
         for stim_ in stim:
-            temp.append(get_scaling(stim_, normalize))
-        temp = np.array(temp)
+            m, s = _get_scaling(stim_, normalize)
+            temp_m.append(m)
+            temp_s.append(s)
+        temp_m = np.array(temp_m)
+        temp_s = np.array(temp_s)
+        m = temp_m.mean(axis=-1)
         if normalize == 'l1':
-            scaling = temp.sum(axis=-1)
+            scaling = temp_s.mean(axis=-1)
         else:
-            scaling = (temp ** 2).sum(axis=-1) ** 0.5
+            scaling = (temp_s ** 2).mean(axis=-1) ** 0.5
     else:
-        scaling = get_scaling(stim, normalize)
+        m, scaling = _get_scaling(stim, normalize)
 
-    return scaling
+    return m, scaling
 
 
-def get_scaling(stim, normalize):
+def _get_scaling(stim, normalize):
     if isinstance(stim, NDVar):
         stim = [stim, ]
+    m = np.zeros(len(stim))
     scaling = np.zeros(len(stim))
     for i, stim_ in enumerate(stim):
+        m[i] = stim_.mean()
         if normalize == 'l1':
-            temp = stim_.abs().mean('time')
-            if temp.has_case:
-                scaling[i] = temp.mean('case')
+            temp = (stim_ - m[i]).abs().mean('time')
+            if stim_.has_case:
+                scaling[i] = temp.mean()
             else:
                 scaling[i] = temp
         else:
-            temp = (stim_ ** 2).mean('time')
-            if temp.has_case:
-                scaling[i] = temp.mean('case') ** 0.5
+            temp = ((stim_ - m[i]) ** 2).mean('time')
+            if stim_.has_case:
+                scaling[i] = temp.mean() ** 0.5
             else:
                 scaling[i] = temp ** 0.5
-    return scaling
+    return m, scaling
