@@ -365,7 +365,8 @@ class REG_Data:
         """
         obj = type(self).__new__(self.__class__)
         # take care of the copied values from the old_obj
-        copy_keys = ['_n_predictor_variables', 'basis', 'filter_length', 'tstart', 'tstep', 'tstop', '_stim_is_single', '_stim_dims', '_stim_names', '_prewhitened']
+        copy_keys = ['_n_predictor_variables', 'basis', 'filter_length', 'tstart', 'tstep', 'tstop', '_stim_is_single',
+                     '_stim_dims', '_stim_names', '_stim_baseline', '_stim_scaling', '_prewhitened']
         obj.__dict__.update({key: self.__dict__[key] for key in copy_keys})
         # keep track of the normalization
         obj._norm_factor = sqrt(len(idx))
