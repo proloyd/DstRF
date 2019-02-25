@@ -114,6 +114,18 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         dstrf([y1, y2], [[x1_attended, x1_unattended], [x2_attended, x2_unattended]], fwd, cov)
 
     """
+    # Note this before turning stim into lists
+    stim_is_single = isinstance(stim, NDVar) if isinstance(meg, NDVar) else isinstance(stim[0], NDVar)
+
+    if isinstance(meg, NDVar):
+        megs = (meg,)
+        stims = (stim,)
+    elif isinstance(meg, Sequence):
+        megs = meg
+        stims = stim
+    else:
+        raise TypeError(f"meg={meg!r}")
+
     # normalize=True defaults to 'l2'
     if normalize is True:
         normalize = 'l2'
@@ -135,29 +147,24 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
                 raise ValueError(f"normalize={normalize!r}, need bool or \'l1\' or \'l2\'")
         else:
             raise TypeError(f"normalize={normalize!r}, need bool or str")
-        ms, s_scale = get_scaling(meg, stim, normalize)
+        s_baseline, s_scale = get_scaling(stims, normalize)
     else:
-        ms, s_scale = (0, 1)
+        s_baseline, s_scale = (None, None)
 
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
-    ds = REG_Data(tstart, tstop, nlevels)
-    for r, ss in iter_data(meg, stim):
+    ds = REG_Data(tstart, tstop, nlevels, s_baseline, s_scale, stim_is_single)
+    for r, ss in iter_data(megs, stims):
         if normalize:
             if not in_place:
                 ss = [s.copy() for s in ss]
-            for s, m, scale in zip(ss, ms, s_scale):
-                s.x -= m
-                s.x /= s_scale[:, np.newaxis]
-                # if normalize == 'l2':
-                #     s_scale = (s ** 2).mean('time') ** 0.5
-                # elif normalize == 'l1':
-                #     s_scale = s.abs().mean('time')
-                # else:
-                #     raise RuntimeError(f"normalize={normalize!r}")
-                # s /= s_scale
+            # for s, m, scale in zip(ss, s_baseline, s_scale):
+            #     s -= m
+            #     s /= scale
         ds.add_data(r, ss)
+    import ipdb
+    ipdb.set_trace()
     # TODO: make this less hacky when fixing normalization (iter_data() always turns stim into lists)
-    ds._stim_is_single = isinstance(stim, NDVar) if isinstance(meg, NDVar) else isinstance(stim[0], NDVar)
+    # ds._stim_is_single = isinstance(stim, NDVar) if isinstance(meg, NDVar) else isinstance(stim[0], NDVar)
 
     # noise covariance
     if isinstance(noise, NDVar):
@@ -215,17 +222,8 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     return model
 
 
-def iter_data(meg, stim):
+def iter_data(megs, stims):
     """Iterate over data as ``meg, (stim1, ...)`` tuples"""
-    if isinstance(meg, NDVar):
-        megs = (meg,)
-        stims = (stim,)
-    elif isinstance(meg, Sequence):
-        megs = meg
-        stims = stim
-    else:
-        raise TypeError(f"meg={meg!r}")
-
     for meg, stim in zip(megs, stims):
         if meg.has_case:
             # assume stim has case too
@@ -246,44 +244,51 @@ def iter_data(meg, stim):
             yield meg, stim
 
 
-def get_scaling(meg, stim, normalize):
-    if isinstance(meg, list):
-        temp_m = []
-        temp_s = []
-        for stim_ in stim:
-            m, s = _get_scaling(stim_, normalize)
-            temp_m.append(m)
-            temp_s.append(s)
-        temp_m = np.array(temp_m)
-        temp_s = np.array(temp_s)
-        m = temp_m.mean(axis=-1)
-        if normalize == 'l1':
-            scaling = temp_s.mean(axis=-1)
-        else:
-            scaling = (temp_s ** 2).mean(axis=-1) ** 0.5
+def get_scaling(stims, normalize):
+    temp_m = []
+    temp_s = []
+    for stim_ in stims:
+        m = _get_baseline(stim_)
+        temp_m.append(m)
+    m = np.array(temp_m).mean(axis=0)
+
+    for stim_ in stims:
+        s = _get_scale(stim_, m, normalize)
+        temp_s.append(s)
+    temp_s = np.array(temp_s)
+
+    if normalize == 'l1':
+        scaling = temp_s.mean(axis=0)
     else:
-        m, scaling = _get_scaling(stim, normalize)
+        scaling = (temp_s ** 2).mean(axis=0) ** 0.5
 
     return m, scaling
 
 
-def _get_scaling(stim, normalize):
+def _get_baseline(stim):
     if isinstance(stim, NDVar):
         stim = [stim, ]
     m = np.zeros(len(stim))
-    scaling = np.zeros(len(stim))
     for i, stim_ in enumerate(stim):
         m[i] = stim_.mean()
+    return m
+
+
+def _get_scale(stim, baseline, normalize):
+    if isinstance(stim, NDVar):
+        stim = [stim, ]
+    scaling = np.zeros(len(stim))
+    for i, (stim_, m) in enumerate(zip(stim, baseline)):
         if normalize == 'l1':
-            temp = (stim_ - m[i]).abs().mean('time')
+            temp = (stim_ - m).abs().mean('time')
             if stim_.has_case:
                 scaling[i] = temp.mean()
             else:
                 scaling[i] = temp
         else:
-            temp = ((stim_ - m[i]) ** 2).mean('time')
+            temp = ((stim_ - m) ** 2).mean('time')
             if stim_.has_case:
                 scaling[i] = temp.mean() ** 0.5
             else:
                 scaling[i] = temp ** 0.5
-    return m, scaling
+    return scaling

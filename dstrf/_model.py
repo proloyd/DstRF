@@ -8,6 +8,7 @@ from numpy.core.umath_tests import inner1d
 from scipy import linalg
 from math import sqrt, log10
 from tqdm import tqdm
+from collections import Sequence
 
 # eelbrain imports
 from eelbrain import UTS, NDVar, combine, Case
@@ -221,19 +222,21 @@ class REG_Data:
     _n_predictor_variables = 1
     _prewhitened = None
 
-    def __init__(self, tstart, tstop, nlevel=1):
+    def __init__(self, tstart, tstop, nlevel=1, baseline=None, scaling=None, stim_is_single=None):
         if tstart != 0:
             raise NotImplementedError("tstart != 0 is not implemented")
         self.tstart = tstart
         self.tstop = tstop
         self.nlevel = nlevel
+        self.s_baseline = baseline
+        self.s_scaling = scaling
         self.meg = []
         self.covariates = []
         self.tstep = None
         self.filter_length = None
         self.basis = None
         self._norm_factor = None
-        self._stim_is_single = None
+        self._stim_is_single = stim_is_single
         self._stim_dims = None
         self._stim_names = None
         self.sensor_dim = None
@@ -259,9 +262,12 @@ class REG_Data:
         meg_time = meg.get_dim('time')
         if self._stim_is_single is None:
             self._stim_is_single = isinstance(stim, NDVar)
+        elif isinstance(stim, Sequence):
+            if (len(stim) == 1) != self._stim_is_single:
+                raise TypeError(f"{stim!r}")
         elif isinstance(stim, NDVar) != self._stim_is_single:
             raise TypeError(f"{stim!r}")
-        stims = (stim,) if self._stim_is_single else stim
+        stims = (stim,) if isinstance(stim, NDVar) else stim
         stim_dims = []
         for x in stims:
             if x.get_dim('time') != meg_time:
@@ -273,6 +279,18 @@ class REG_Data:
                 stim_dims.append(dim)
             else:
                 raise ValueError(f"stim={stim}: stimulus with more than 2 dimensions")
+
+        # stim normalization
+        if self.s_baseline is not None and self.s_scaling is not None:
+            if len(self.s_scaling) != len(stims) or len(self.s_baseline) != len(stims):
+                 raise ValueError(f"stim={stim!r}: size of stimulus scaling: {len(self.s_scaling)} and/or baseline: "
+                                  f"{len(self.s_baseline)} is not compatible with added stimulus")
+            for s, m, scale in zip(stims, self.s_baseline, self.s_scaling):
+                s -= m
+                s /= scale
+
+            import ipdb
+            ipdb.set_trace()
 
         if self.tstep is None:
             # initialize time axis
@@ -410,6 +428,8 @@ class DstRF:
     _stim_is_single = None
     _stim_dims = None
     _stim_names = None
+    _stim_baseline = None
+    _stim_scaling = None
     _basis = None
     tstart = None
     tstep = None
@@ -459,7 +479,8 @@ class DstRF:
             obj.__dict__.update({key: self.__dict__.get(key, None)})
         return obj
 
-    _PICKLE_ATTRS = ('_basis', '_cv_info', '_name', '_stim_is_single', '_stim_dims', '_stim_names', 'source', 'space', 'theta', 'tstart', 'tstep', 'tstop')
+    _PICKLE_ATTRS = ('_basis', '_cv_info', '_name', '_stim_is_single', '_stim_dims', '_stim_names', '_stim_baseline',
+                     '_stim_scaling', 'source', 'space', 'theta', 'tstart', 'tstep', 'tstop')
 
     def __getstate__(self):
         return {k: getattr(self, k) for k in self._PICKLE_ATTRS}
@@ -705,6 +726,8 @@ class DstRF:
         self._stim_is_single = data._stim_is_single
         self._stim_dims = data._stim_dims
         self._stim_names = data._stim_names
+        self._stim_baseline = data.s_baseline
+        self._stim_scaling = data.s_scaling
         self._basis = data.basis
         self.tstart = data.tstart
         self.tstep = data.tstep
