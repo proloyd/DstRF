@@ -289,9 +289,6 @@ class REG_Data:
                 s -= m
                 s /= scale
 
-            import ipdb
-            ipdb.set_trace()
-
         if self.tstep is None:
             # initialize time axis
             self.tstep = meg_time.tstep

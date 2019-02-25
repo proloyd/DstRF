@@ -147,6 +147,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
                 raise ValueError(f"normalize={normalize!r}, need bool or \'l1\' or \'l2\'")
         else:
             raise TypeError(f"normalize={normalize!r}, need bool or str")
+
         s_baseline, s_scale = get_scaling(stims, normalize)
     else:
         s_baseline, s_scale = (None, None)
@@ -161,8 +162,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
             #     s -= m
             #     s /= scale
         ds.add_data(r, ss)
-    import ipdb
-    ipdb.set_trace()
+
     # TODO: make this less hacky when fixing normalization (iter_data() always turns stim into lists)
     # ds._stim_is_single = isinstance(stim, NDVar) if isinstance(meg, NDVar) else isinstance(stim[0], NDVar)
 
@@ -263,6 +263,7 @@ def get_scaling(stims, normalize):
         scaling = (temp_s ** 2).mean(axis=0) ** 0.5
 
     return m, scaling
+
 
 
 def _get_baseline(stim):
