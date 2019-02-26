@@ -525,7 +525,8 @@ class DstRF:
         self.mu = mu
         self._init_iter(data)
         data._precompute()
-        self._solve(data, self.theta, n_iterc=30)
+        if mu == 0.0:
+            self._solve(data, self.theta, n_iterc=30)
         return self
 
     def _solve(self, data, theta, idx=slice(None, None), n_iterc=None):
