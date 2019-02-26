@@ -28,7 +28,7 @@ to perform a 3-fold cross-validation and then construct the model for 1s long TR
 
 For more options, please look at the docstring. The learned TRF, `h` can be retrieved using:
 ```python
-h = model.get_strf()
+h = model.h
 ```
 
 ## Results
