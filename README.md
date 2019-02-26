@@ -39,11 +39,14 @@ auditory periphery) across the frequency bands, sampled at `200 Hz`.  A volume s
 
 Isn't that cool? Do expect to see something like that with any other source localization method? If you realize you could use this method on your data, please feel free to use the codes. You can reach me at proloy@umd.edu if you have any issues with the codes. And don't forget to go over the papers/ posters before applying the algorithm. 
 
-*Note: this is a dev version, and I will be adding more functionality over time, so feel free to ask me 
-to add any other functionality, or report if anything is broken.*
-    
-## Citation
-This repo is open for anyone to use under Apache license. But if you use this code for your publication, I will appreciate you if cite my papers mentioned above.
+## Bug reports / Contact
+*Since this is a dev version, and I will be adding more functionality over time, so feel free to ask me to add any other functionality, or report if anything is broken.
+If you want to contact the author, you can do so under the following email-address: proloy@umd.edu*
+
+Terms of Use / License
+----------------------
+This repository is free software, covered by the Apache License 2.0. However since they have been mainly developed for academic use, the author would appreciate being given academic credit for it. 
+Whenever you use this software to produce a publication or talk, please cite the following references.
 
 ## References
 [1] P. Das, C. Brodbeck, J. Z. Simon, B. Babadi, [Direct Cortical Localization of the MEG Auditory Temporal Response 

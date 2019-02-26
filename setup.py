@@ -4,7 +4,6 @@ from Cython.Distutils import build_ext
 from os.path import pathsep
 from setuptools import setup, find_packages
 import numpy as np
-from os import system
 
 
 # Use cython only if *.pyx files are present (i.e., not in sdist)
@@ -27,15 +26,14 @@ else:
 
 setup(
     name="dstrf",
-    description="MEG/EEG analysis tools",
-    version="0.1",
+    description="MEG/EEG source localization tool",
+    version="0.1dev",
     packages=find_packages(),
-    python_requires='>=3.0',
+    python_requires='>=3.6',
 
     install_requires=[
         'eelbrain',
     ],
-
 
     # metadata for upload to PyPI
     author="Proloy DAS",
@@ -45,6 +43,6 @@ setup(
     include_dirs=[np.get_include()],
     ext_modules=cythonize(ext_modules),
     project_urls={
-        "Source Code": "https://github.com/proloyd/fastapy",
+        "Source Code": "https://github.com/proloyd/DstRF",
     }
 )
