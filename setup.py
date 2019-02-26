@@ -30,7 +30,7 @@ setup(
     description="MEG/EEG source localization tool",
     long_description='add-on module to eelbrain for neural TRF estimation'
                      'GitHub: https://github.com/proloyd/DstRF',
-    version="0.1dev",
+    version="0.1",
     python_requires='>=3.6',
 
     install_requires=[
