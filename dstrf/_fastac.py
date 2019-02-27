@@ -165,7 +165,6 @@ class Fasta:
     Call solver
     >>> lsq.learn(x0, verbose=1)
     """
-
     def __init__(self, f, g, gradf, proxg, beta=0.5, n_iter=1000):
         self.f = f
         self.g = g
@@ -202,8 +201,7 @@ class Fasta:
         """
         coefs_current = np.copy(coefs_init)
         grad_current = self.grad(coefs_current)
-        coefs_next = coefs_current \
-                     + 0.01 * np.random.randn(coefs_current.shape[0], coefs_current.shape[1])
+        coefs_next = coefs_current + 0.01 * np.random.randn(coefs_current.shape[0], coefs_current.shape[1])
         grad_next = self.grad(coefs_next)
         tau_current = _next_stepsize(coefs_next - coefs_current,
                                      grad_next - grad_current)
@@ -218,9 +216,8 @@ class Fasta:
 
         start = time.time()
         for i in range(self.n_iter):
-            coefs_next, objective_next, sub_grad, tau, n_backtracks \
-                = _update_coefs(coefs_current, tau_current, grad_current,
-                                self.prox, self.f, self.g, self.beta, max(self._funcValues))
+            coefs_next, objective_next, sub_grad, tau, n_backtracks = _update_coefs(coefs_current, tau_current,
+                                grad_current, self.prox, self.f, self.g, self.beta, max(self._funcValues))
 
             self._funcValues.append(objective_next)
 
@@ -242,7 +239,7 @@ class Fasta:
                 self.objective.append(objective_next + self.g(coefs_next))
                 print("Iteration : {:}, objective value : {:f}, "
                       "stepsize : {:f}, backtracking steps taken: {:}, "
-                      "residual : {:f} \n".format(i + 1, self.objective[i],
+                      "residual : {:f} n".format(i + 1, self.objective[i],
                                                   self.stepsizes[i],
                                                   self.backtracks[i],
                                                   self.residuals[i]))
