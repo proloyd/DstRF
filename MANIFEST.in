@@ -1,1 +1,3 @@
 recursive-include . *3.c *3.h *.pyx *.py
+include dstrf/dsyevh3C/COPYING
+include dstrf/dsyevh3C/README
