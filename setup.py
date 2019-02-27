@@ -5,18 +5,14 @@ from Cython.Distutils import build_ext
 from os.path import pathsep
 import numpy as np
 
-
-# Use cython only if *.pyx files are present (i.e., not in sdist)
-ext_paths = ('dstrf/*%s', 'dstrf/dsyevh3C/*%s')
-if glob(ext_paths[0] % '.pyx'):
+try:
     from Cython.Build import cythonize
+except ImportError:
+    cythonize = False
 
-    ext_modules = [Extension(path,
-                             [path % '.pyx'],
-                             extra_compile_args=['-std=c99'],
-                             ) for path in ext_paths]
-    ext_modules = cythonize(ext_modules)
-else:
+# Cython extensions
+ext_paths = ('dstrf/*%s', 'dstrf/dsyevh3C/*%s')
+if cythonize is False:
     actual_paths = []
     for path in ext_paths:
         actual_paths.extend(glob(path % '.c'))
@@ -24,11 +20,17 @@ else:
         Extension(path.replace(pathsep, '.')[:-2], [path])
         for path in actual_paths
     ]
+else:
+    ext_modules = [Extension(path,
+                             [path % '.pyx'],
+                             extra_compile_args=['-std=c99'],
+                             ) for path in ext_paths]
+    ext_modules = cythonize(ext_modules)
 
 setup(
     name="dstrf",
     description="MEG/EEG source localization tool",
-    long_description='add-on module to eelbrain for neural TRF estimation'
+    long_description='add-on module to eelbrain for neural TRF estimation '
                      'GitHub: https://github.com/proloyd/DstRF',
     version="0.1",
     python_requires='>=3.6',
@@ -43,6 +45,7 @@ setup(
     license="apache 2.0",
     cmdclass={'build_ext': build_ext},
     include_dirs=[np.get_include()],
+    packages=find_packages(),
     ext_modules=ext_modules,
     url='https://github.com/proloyd/DstRF',
     project_urls={
