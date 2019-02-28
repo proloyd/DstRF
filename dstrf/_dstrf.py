@@ -139,18 +139,10 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     if not isinstance(in_place, bool):
         raise TypeError(f"in_place={in_place!r}, need bool or None")
 
-    if normalize:  # screens False, None
-        if isinstance(normalize, bool):  # normalize=True defaults to 'l2'
-            normalize = 'l2'
-        elif isinstance(normalize, str):
-            if normalize not in ('l1', 'l2'):
-                raise ValueError(f"normalize={normalize!r}, need bool or \'l1\' or \'l2\'")
-        else:
-            raise TypeError(f"normalize={normalize!r}, need bool or str")
-
+    if normalize:
         s_baseline, s_scale = get_scaling(stims, normalize)
     else:
-        s_baseline, s_scale = (None, None)
+        s_baseline, s_scale = None, None
 
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
     ds = REG_Data(tstart, tstop, nlevels, s_baseline, s_scale, stim_is_single)
