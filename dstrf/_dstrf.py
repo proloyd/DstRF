@@ -1,4 +1,5 @@
 from collections import Sequence
+from typing import List
 
 from eelbrain import NDVar, combine
 from mne import Covariance
@@ -114,18 +115,6 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         dstrf([y1, y2], [[x1_attended, x1_unattended], [x2_attended, x2_unattended]], fwd, cov)
 
     """
-    # Note this before turning stim into lists
-    stim_is_single = isinstance(stim, NDVar) if isinstance(meg, NDVar) else isinstance(stim[0], NDVar)
-
-    if isinstance(meg, NDVar):
-        megs = (meg,)
-        stims = (stim,)
-    elif isinstance(meg, Sequence):
-        megs = meg
-        stims = stim
-    else:
-        raise TypeError(f"meg={meg!r}")
-
     # normalize=True defaults to 'l2'
     if normalize is True:
         normalize = 'l2'
@@ -139,24 +128,57 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     if not isinstance(in_place, bool):
         raise TypeError(f"in_place={in_place!r}, need bool or None")
 
+    # make meg/stim representation uniform:
+    meg_trials = []  # [trial_1, trial_2, ...]
+    stim_trials = []  # [[trial_1_stim_1, trial_1_stim_2, ...], ...]
+    if isinstance(meg, NDVar):
+        meg_list = [meg]
+        stim_list = [stim]
+    elif isinstance(meg, Sequence):
+        if len(stim) != len(meg):
+            raise ValueError(f"meg={meg}, stim={stim}: different length")
+        meg_list = list(meg)
+        stim_list = list(stim)
+    else:
+        raise TypeError(f"meg={meg!r}")
+    stim_is_single = None
+    for meg_chunk, stim_chunk in zip(meg_list, stim_list):
+        if meg_chunk.has_case:
+            n_trials = len(meg_chunk)
+            meg_trials.extend(meg_chunk)
+        else:
+            n_trials = 0
+            meg_trials.append(meg_chunk)
+
+        if stim_is_single is None:
+            stim_is_single = isinstance(stim_chunk, NDVar)
+        elif stim_is_single != isinstance(stim_chunk, NDVar):
+            raise ValueError(f"stim={stim}: inconsistent element types (NDVar/list)")
+
+        if stim_is_single:
+            stim_chunk = [stim_chunk]
+
+        if n_trials:
+            if not all(s.has_case and len(s) == n_trials for s in stim_chunk):
+                raise ValueError(f"meg={meg}, stim={stim}: inconsistent number of cases")
+            stim_trials.extend(zip(*stim_chunk))
+        else:
+            if any(s.has_case for s in stim_chunk):
+                raise ValueError(f"meg={meg}, stim={stim}: inconsistent case dimensions")
+            stim_trials.append(stim_chunk)
+
     if normalize:
-        s_baseline, s_scale = get_scaling(stims, normalize)
+        s_baseline, s_scale = get_scaling(stim_trials, normalize)
     else:
         s_baseline, s_scale = None, None
 
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
     ds = REG_Data(tstart, tstop, nlevels, s_baseline, s_scale, stim_is_single)
-    for r, ss in iter_data(megs, stims):
+    for r, ss in zip(meg_trials, stim_trials):
         if normalize:
             if not in_place:
                 ss = [s.copy() for s in ss]
-            # for s, m, scale in zip(ss, s_baseline, s_scale):
-            #     s -= m
-            #     s /= scale
         ds.add_data(r, ss)
-
-    # TODO: make this less hacky when fixing normalization (iter_data() always turns stim into lists)
-    # ds._stim_is_single = isinstance(stim, NDVar) if isinstance(meg, NDVar) else isinstance(stim[0], NDVar)
 
     # noise covariance
     if isinstance(noise, NDVar):
@@ -214,74 +236,13 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     return model
 
 
-def iter_data(megs, stims):
-    """Iterate over data as ``meg, (stim1, ...)`` tuples"""
-    for meg, stim in zip(megs, stims):
-        if meg.has_case:
-            # assume stim has case too
-            if isinstance(stim, NDVar):
-                # single stim
-                assert stim.has_case and len(stim) == len(meg)
-                for meg_trial, stim_trial in zip(meg, stim):
-                    yield meg_trial, (stim_trial,)
-            else:
-                # sequence stim
-                assert all(s.has_case for s in stim)
-                assert all(len(s) == len(meg) for s in stim)
-                for meg_trial, *stims_trial in zip(meg, *stim):
-                    yield meg_trial, stims_trial
-        elif isinstance(stim, NDVar):
-            yield meg, (stim,)
-        else:
-            yield meg, stim
-
-
-def get_scaling(stims, normalize):
-    temp_m = []
-    temp_s = []
-    for stim_ in stims:
-        m = _get_baseline(stim_)
-        temp_m.append(m)
-    m = np.array(temp_m).mean(axis=0)
-
-    for stim_ in stims:
-        s = _get_scale(stim_, m, normalize)
-        temp_s.append(s)
-    temp_s = np.array(temp_s)
-
+def get_scaling(all_stims: List[List[NDVar]], normalize: str):
+    stim_trials = zip(*all_stims)  # -> [[stim_1_trial_1, stim_1_trial_2, ...], ...]
+    n = sum(len(stim.time) for stim in stim_trials[0])
+    means = [sum(s.sum('time') for s in trials) / n for trials in stim_trials]
+    stim_trials = [[s - mean for s in stims] for mean, stims in zip(means, stim_trials)]
     if normalize == 'l1':
-        scaling = temp_s.mean(axis=0)
+        scales = [sum(s.abs().sum('time') for s in trials) / n for trials in stim_trials]
     else:
-        scaling = (temp_s ** 2).mean(axis=0) ** 0.5
-
-    return m, scaling
-
-
-
-def _get_baseline(stim):
-    if isinstance(stim, NDVar):
-        stim = [stim, ]
-    m = np.zeros(len(stim))
-    for i, stim_ in enumerate(stim):
-        m[i] = stim_.mean()
-    return m
-
-
-def _get_scale(stim, baseline, normalize):
-    if isinstance(stim, NDVar):
-        stim = [stim, ]
-    scaling = np.zeros(len(stim))
-    for i, (stim_, m) in enumerate(zip(stim, baseline)):
-        if normalize == 'l1':
-            temp = (stim_ - m).abs().mean('time')
-            if stim_.has_case:
-                scaling[i] = temp.mean()
-            else:
-                scaling[i] = temp
-        else:
-            temp = ((stim_ - m) ** 2).mean('time')
-            if stim_.has_case:
-                scaling[i] = temp.mean() ** 0.5
-            else:
-                scaling[i] = temp ** 0.5
-    return scaling
+        scales = [sum((s ** 2).sum('time') for s in trials) / n for trials in stim_trials]
+    return means, scales
