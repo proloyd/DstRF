@@ -407,6 +407,9 @@ class DstRF:
         data covariances under the model
     theta: ndarray
         trf coefficients over Gabor basis.
+    residual : float | NDVar
+        The fit error, i.e. the result of the ``eval_obj`` error function on the
+        final fit.
     stim_baseline: NDVar| float| list | None
         Mean that was subtracted from ``stim``.
     stim_scaling: NDVar| float| list | None
@@ -436,6 +439,7 @@ class DstRF:
     tstart = None
     tstep = None
     tstop = None
+    residual = None
 
     def __init__(self, lead_field, noise_covariance, n_iter=30, n_iterc=10, n_iterf=100):
         if lead_field.has_dim('space'):
@@ -718,6 +722,7 @@ class DstRF:
                 print("objective value after champ:{:10f}\n "
                       "%% change:{:2f}".format(self.objective_vals[-1], self.err[-1]*100))
 
+        self.residual = self.eval_obj(data)
         self._stim_is_single = data._stim_is_single
         self._stim_dims = data._stim_dims
         self._stim_names = data._stim_names
