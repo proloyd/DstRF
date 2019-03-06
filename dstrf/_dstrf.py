@@ -1,7 +1,8 @@
 from collections import Sequence
 from typing import List
+from math import sqrt
 
-from eelbrain import NDVar, combine
+from eelbrain import NDVar
 from mne import Covariance
 import numpy as np
 
@@ -166,7 +167,6 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
             if any(s.has_case for s in stim_chunk):
                 raise ValueError(f"meg={meg}, stim={stim}: inconsistent case dimensions")
             stim_trials.append(stim_chunk)
-
     if normalize:
         s_baseline, s_scale = get_scaling(stim_trials, normalize)
     else:
@@ -175,9 +175,8 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
     ds = REG_Data(tstart, tstop, nlevels, s_baseline, s_scale, stim_is_single)
     for r, ss in zip(meg_trials, stim_trials):
-        if normalize:
-            if not in_place:
-                ss = [s.copy() for s in ss]
+        if not in_place:
+            ss = [s.copy() for s in ss]
         ds.add_data(r, ss)
 
     # noise covariance
@@ -237,12 +236,12 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
 
 
 def get_scaling(all_stims: List[List[NDVar]], normalize: str):
-    stim_trials = zip(*all_stims)  # -> [[stim_1_trial_1, stim_1_trial_2, ...], ...]
+    stim_trials = [trials for trials in zip(*all_stims)]  # -> [[stim_1_trial_1, stim_1_trial_2, ...], ...]
     n = sum(len(stim.time) for stim in stim_trials[0])
     means = [sum(s.sum('time') for s in trials) / n for trials in stim_trials]
     stim_trials = [[s - mean for s in stims] for mean, stims in zip(means, stim_trials)]
     if normalize == 'l1':
         scales = [sum(s.abs().sum('time') for s in trials) / n for trials in stim_trials]
     else:
-        scales = [sum((s ** 2).sum('time') for s in trials) / n for trials in stim_trials]
+        scales = [sqrt(sum((s ** 2).sum('time') for s in trials) / n) for trials in stim_trials]
     return means, scales
