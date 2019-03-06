@@ -681,11 +681,11 @@ class DstRF:
         self._set_mu(mu, data)
 
         if self.space:
-            g_funct = lambda x: g(x, self.mu)
-            prox_g = lambda x, t: shrink(x, self.mu * t)
-        else:
             g_funct = lambda x: g_group(x, self.mu)
             prox_g = lambda x, t: proxg_group_opt(x, self.mu * t)
+        else:
+            g_funct = lambda x: g(x, self.mu)
+            prox_g = lambda x, t: shrink(x, self.mu * t)
 
         theta = self.theta
 
