@@ -7,12 +7,21 @@ This repository contains the implementation of our direct TRF estimation algorit
 Eelbrain ([Download/ Installation Instructions](https://github.com/christianbrodbeck/Eelbrain/wiki/Installing#release))
 
 ## Installation
-clone the repository and install using pip: 
+After successfully installing Eelbrain, one can follow either of the methods to install different versions the repository.   
 
+### Installing the release version
+The following comment will install the latest released version:
+```commandline
+pip install dstrf
 ```
+
+### Development version from GiHub
+After cloning the GitHub repository, install using pip: 
+
+```commandline
 git clone https://github.com/proloyd/DstRF.git
 cd DstRF
-pip install .
+pip install -e .
 ```
 and there you go!
 

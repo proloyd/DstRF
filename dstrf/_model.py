@@ -8,10 +8,9 @@ from numpy.core.umath_tests import inner1d
 from scipy import linalg
 from math import sqrt, log10
 from tqdm import tqdm
-from collections import Sequence
 
 # eelbrain imports
-from eelbrain import UTS, NDVar, combine, Case
+from eelbrain import UTS, NDVar
 from eelbrain._utils import LazyProperty
 
 from ._fastac import Fasta
@@ -218,6 +217,10 @@ class REG_Data:
     nlevels : int
         Decides the density of Gabor atoms. Bigger nlevel -> less dense basis.
         By default it is set to `1`. `nlevesl > 2` should be used with caution.
+    baseline: list | None
+        Mean that will be subtracted from ``stim``.
+    scaling: list | None
+        Scale by which ``stim`` was divided.
     """
     _n_predictor_variables = 1
     _prewhitened = None
@@ -260,13 +263,6 @@ class REG_Data:
 
         # check stim dimensions
         meg_time = meg.get_dim('time')
-        if self._stim_is_single is None:
-            self._stim_is_single = isinstance(stim, NDVar)
-        elif isinstance(stim, Sequence):
-            if (len(stim) == 1) != self._stim_is_single:
-                raise TypeError(f"{stim!r}")
-        elif isinstance(stim, NDVar) != self._stim_is_single:
-            raise TypeError(f"{stim!r}")
         stims = (stim,) if isinstance(stim, NDVar) else stim
         stim_dims = []
         for x in stims:
@@ -401,12 +397,23 @@ class DstRF:
 
     Attributes
     ----------
+    h : NDVar | tuple of NDVar
+        The temporal response function. Whether ``h`` is an NDVar or a tuple of
+        NDVars depends on whether the ``x`` parameter to :func:`dstrf` was
+        an NDVar or a sequence of NDVars.
     Gamma: list
         individual source covariance matrices
     sigma_b: list of ndarray
         data covariances under the model
     theta: ndarray
         trf coefficients over Gabor basis.
+    residual : float | NDVar
+        The fit error, i.e. the result of the ``eval_obj`` error function on the
+        final fit.
+    stim_baseline: NDVar| float| list | None
+        Mean that was subtracted from ``stim``.
+    stim_scaling: NDVar| float| list | None
+        Scale by which ``stim`` was divided.
 
     Notes
     -----
@@ -432,6 +439,7 @@ class DstRF:
     tstart = None
     tstep = None
     tstop = None
+    residual = None
 
     def __init__(self, lead_field, noise_covariance, n_iter=30, n_iterc=10, n_iterf=100):
         if lead_field.has_dim('space'):
@@ -452,14 +460,6 @@ class DstRF:
 
         # self._init_vars()
         self._whitening_filter = None
-
-    def _init_vars(self):
-        wf = linalg.cholesky(self.noise_covariance, lower=True)
-        Gtilde = linalg.solve(wf, self.lead_field)
-        self.eta = (self.lead_field.shape[0] / np.trace(np.dot(Gtilde, Gtilde.T)))
-        # model data covariance
-        sigma_b = self.noise_covariance + self.eta * np.dot(self.lead_field, self.lead_field.T)
-        self.init_sigma_b = sigma_b
 
     def __repr__(self):
         if self.space:
@@ -681,11 +681,11 @@ class DstRF:
         self._set_mu(mu, data)
 
         if self.space:
-            g_funct = lambda x: g(x, self.mu)
-            prox_g = lambda x, t: shrink(x, self.mu * t)
-        else:
             g_funct = lambda x: g_group(x, self.mu)
             prox_g = lambda x, t: proxg_group_opt(x, self.mu * t)
+        else:
+            g_funct = lambda x: g(x, self.mu)
+            prox_g = lambda x, t: shrink(x, self.mu * t)
 
         theta = self.theta
 
@@ -722,11 +722,13 @@ class DstRF:
                 print("objective value after champ:{:10f}\n "
                       "%% change:{:2f}".format(self.objective_vals[-1], self.err[-1]*100))
 
+        self.residual = self.eval_obj(data)
         self._stim_is_single = data._stim_is_single
         self._stim_dims = data._stim_dims
         self._stim_names = data._stim_names
-        self._stim_baseline = data.s_baseline
-        self._stim_scaling = data.s_scaling
+        if self._stim_is_single:
+            self._stim_baseline = data.s_baseline[0]
+            self._stim_scaling = data.s_scaling[0]
         self._basis = data.basis
         self.tstart = data.tstart
         self.tstep = data.tstep
@@ -850,8 +852,7 @@ class DstRF:
         else:
             trf = self.theta[np.newaxis, :]
 
-        # trf = np.tensordot(trf, data.basis.T, axes=1)
-        trf = np.dot(trf, self._basis.T)
+        trf = np.dot(trf, self._basis.T) / self.lead_field_scaling
 
         time = UTS(self.tstart, self.tstep, trf.shape[-1])
         if self.space:
