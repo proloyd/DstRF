@@ -852,7 +852,7 @@ class DstRF:
         else:
             trf = self.theta[np.newaxis, :]
 
-        trf = np.dot(trf, self._basis.T)
+        trf = np.dot(trf, self._basis.T) / self.lead_field_scaling
 
         time = UTS(self.tstart, self.tstep, trf.shape[-1])
         if self.space:
