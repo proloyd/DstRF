@@ -116,15 +116,6 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         dstrf([y1, y2], [[x1_attended, x1_unattended], [x2_attended, x2_unattended]], fwd, cov)
 
     """
-    # normalize=True defaults to 'l2'
-    if normalize is True:
-        normalize = 'l2'
-    elif isinstance(normalize, str):
-        if normalize not in ('l1', 'l2'):
-            raise ValueError(f"normalize={normalize!r}, need bool or 'l1' or 'l2'")
-    else:
-        raise TypeError(f"normalize={normalize!r}, need bool or str")
-
     # data copy?
     if not isinstance(in_place, bool):
         raise TypeError(f"in_place={in_place!r}, need bool or None")
@@ -167,10 +158,19 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
             if any(s.has_case for s in stim_chunk):
                 raise ValueError(f"meg={meg}, stim={stim}: inconsistent case dimensions")
             stim_trials.append(stim_chunk)
-    if normalize:
+
+    # normalize=True defaults to 'l2'
+    if normalize is False:
+        s_baseline, s_scale = None, None
+    elif normalize is True:
+        normalize = 'l2'
+        s_baseline, s_scale = get_scaling(stim_trials, normalize)
+    elif isinstance(normalize, str):
+        if normalize not in ('l1', 'l2'):
+            raise ValueError(f"normalize={normalize!r}, need bool or 'l1' or 'l2'")
         s_baseline, s_scale = get_scaling(stim_trials, normalize)
     else:
-        s_baseline, s_scale = None, None
+        raise TypeError(f"normalize={normalize!r}, need bool or str")
 
     # Call `REG_Data.add_data` once for each contiguous segment of MEG data
     ds = REG_Data(tstart, tstop, nlevels, s_baseline, s_scale, stim_is_single)
