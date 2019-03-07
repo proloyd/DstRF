@@ -13,7 +13,7 @@ DEFAULT_MUs = np.logspace(-3, -1, 7)
 
 
 def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
-          n_iter=10, n_iterc=10, n_iterf=100, normalize=None, in_place=None,
+          n_iter=10, n_iterc=10, n_iterf=100, normalize=False, in_place=None,
           mu='auto', tol=1e-3, verbose=False, n_splits=3, n_workers=None,
           use_ES=False, **kwargs):
     """One shot function for cortical TRF localization
@@ -55,7 +55,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
         Scale ``stim`` before model fitting: subtract the mean and divide by
         the standard deviation (when ``nomrmalize='l2'`` or ``normalize=True``)
         or the mean absolute value (when ``normalize='l1'``). By default,
-         ``normalize=None`` it leaves ``stim`` data untouched.
+         ``normalize=False`` leaves ``stim`` data untouched.
     in_place: bool
         With ``in_place=False`` (default) the original ``meg`` and ``stims`` are left untouched;
         use ``in_place=True`` to save memory by using the original ``meg`` and ``stim``.
