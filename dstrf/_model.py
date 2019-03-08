@@ -277,12 +277,15 @@ class REG_Data:
                 raise ValueError(f"stim={stim}: stimulus with more than 2 dimensions")
 
         # stim normalization
-        if self.s_baseline is not None and self.s_scaling is not None:
-            if len(self.s_scaling) != len(stims) or len(self.s_baseline) != len(stims):
-                 raise ValueError(f"stim={stim!r}: size of stimulus scaling: {len(self.s_scaling)} and/or baseline: "
-                                  f"{len(self.s_baseline)} is not compatible with added stimulus")
-            for s, m, scale in zip(stims, self.s_baseline, self.s_scaling):
+        if self.s_baseline is not None:
+            if len(self.s_baseline) != len(stims):
+                raise ValueError(f"stim={stim!r}: incompatible with baseline={self.s_baseline!r}")
+            for s, m in zip(stims, self.s_baseline):
                 s -= m
+        if self.s_scaling is not None:
+            if len(self.s_scaling) != len(stims):
+                raise ValueError(f"stim={stim!r}: incompatible with scaling={self.s_scaling!r}")
+            for s, scale in zip(stims, self.s_scaling):
                 s /= scale
 
         if self.tstep is None:
