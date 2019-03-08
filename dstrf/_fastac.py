@@ -261,5 +261,3 @@ class Fasta:
         self.objective_value = objective_next + self.g(coefs_current)
         if verbose:
             print("total time elapsed : {:f}s".format(end - start))
-
-        return self

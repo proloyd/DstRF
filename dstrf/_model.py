@@ -500,7 +500,6 @@ class DstRF:
         # model data covariance
         sigma_b = self.noise_covariance + self.eta * np.dot(self.lead_field, self.lead_field.T)
         self.init_sigma_b = sigma_b
-        return self
 
     def _init_iter(self, data):
         if self.space:
@@ -518,15 +517,12 @@ class DstRF:
         self.theta = np.zeros((len(self.source) * dc, data._n_predictor_variables * data.basis.shape[1]),
                               dtype=np.float64)
 
-        return self
-
     def _set_mu(self, mu, data):
         self.mu = mu
         self._init_iter(data)
         data._precompute()
         if mu == 0.0:
             self._solve(data, self.theta, n_iterc=30)
-        return self
 
     def _solve(self, data, theta, idx=slice(None, None), n_iterc=None):
         """Champagne steps implementation
@@ -610,8 +606,6 @@ class DstRF:
 
             self.Gamma[key] = gamma
             self.Sigma_b[key] = sigma_b
-
-        return self
 
     def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-4, verbose=False, use_ES=False, mus=None, n_splits=None, n_workers=None, debug=False):
         """cTRF estimator implementation
