@@ -14,7 +14,7 @@ url = "https://ece.umd.edu/~proloy/.datasets/%s.pickled"
 names = ('meg', 'stim', 'fwd_sol', 'emptyroom')
 
 # manage local storage
-dirname = os.path.join(os.getcwd(), "dstrf_data")
+dirname = os.path.realpath(os.path.join(__file__, '..', '..', "dstrf_data"))
 if os.path.isdir(dirname) is False:
     os.mkdir(dirname)
 
