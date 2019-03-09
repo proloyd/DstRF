@@ -7,6 +7,8 @@ from mne.utils import _fetch_file
 from dstrf import dstrf
 import math
 
+from eelbrain.testing import assert_dataobj_equal
+
 
 # web url to fetch the file
 url = "https://ece.umd.edu/~proloy/.datasets/%s.pickled"
@@ -53,6 +55,12 @@ def test_dstrf(cmdopt):
     h = model.h
     # check output
     assert math.isclose(h.norm('time').norm('source').norm('space'), 4.350744967130074e-10, rel_tol=0.05)
+
+    # test persistence
+    model_2 = pickle.loads(pickle.dumps(model, pickle.HIGHEST_PROTOCOL))
+    assert_dataobj_equal(model_2.h, model.h)
+    assert_dataobj_equal(model_2.h_scaled, model.h_scaled)
+    assert model_2.residual == model.residual
 
     kwargs['normalize'] = 'l2'
     model = dstrf(*args, **kwargs)
