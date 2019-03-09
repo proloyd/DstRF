@@ -202,11 +202,9 @@ class Fasta:
         """
         coefs_current = np.copy(coefs_init)
         grad_current = self.grad(coefs_current)
-        coefs_next = coefs_current \
-                     + 0.01 * np.random.randn(coefs_current.shape[0], coefs_current.shape[1])
+        coefs_next = coefs_current + 0.01 * np.random.randn(coefs_current.shape[0], coefs_current.shape[1])
         grad_next = self.grad(coefs_next)
-        tau_current = _next_stepsize(coefs_next - coefs_current,
-                                     grad_next - grad_current)
+        tau_current = _next_stepsize(coefs_next - coefs_current, grad_next - grad_current)
 
         self._funcValues.append(self.f(coefs_current))
         if verbose == 1:
@@ -218,9 +216,9 @@ class Fasta:
 
         start = time.time()
         for i in range(self.n_iter):
-            coefs_next, objective_next, sub_grad, tau, n_backtracks \
-                = _update_coefs(coefs_current, tau_current, grad_current,
-                                self.prox, self.f, self.g, self.beta, max(self._funcValues))
+            coefs_next, objective_next, sub_grad, tau, n_backtracks = _update_coefs(coefs_current, tau_current,
+                                                                                    grad_current, self.prox, self.f,
+                                                                                    self.g, self.beta, max(self._funcValues))
 
             self._funcValues.append(objective_next)
 
