@@ -52,18 +52,17 @@ def test_dstrf(cmdopt):
     assert model._stim_scaling == (data['stim'] -  stim_baseline).abs().mean()
     h = model.h
     # check output
-    assert  math.isclose(h.norm('time').norm('source').norm('space'), 4.350744967130074e-10, rel_tol=0.05)
+    assert math.isclose(h.norm('time').norm('source').norm('space'), 4.350744967130074e-10, rel_tol=0.05)
 
     kwargs['normalize'] = 'l2'
     model = dstrf(*args, **kwargs)
     # check scaling
     stim_baseline = data['stim'].mean()
     assert model._stim_baseline == stim_baseline
-
     assert model._stim_scaling == (data['stim'] -  stim_baseline).std()
     h = model.h
     # check output
-    assert  math.isclose(h.norm('time').norm('source').norm('space'),  4.790530198560318e-10, rel_tol=0.05)
+    assert math.isclose(h.norm('time').norm('source').norm('space'),  4.790530198560318e-10, rel_tol=0.05)
 
     # if cmdopt:
     #     kwargs['mu'] = 'auto'

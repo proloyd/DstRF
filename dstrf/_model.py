@@ -515,8 +515,7 @@ class DstRF:
             self.Sigma_b.append(self.init_sigma_b.copy())
 
         # initializing \Theta
-        self.theta = np.zeros((len(self.source) * dc, data._n_predictor_variables *
-                               data.basis.shape[1]),
+        self.theta = np.zeros((len(self.source) * dc, data._n_predictor_variables * data.basis.shape[1]),
                               dtype=np.float64)
 
         return self
