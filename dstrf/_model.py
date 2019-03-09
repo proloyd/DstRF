@@ -277,12 +277,15 @@ class REG_Data:
                 raise ValueError(f"stim={stim}: stimulus with more than 2 dimensions")
 
         # stim normalization
-        if self.s_baseline is not None and self.s_scaling is not None:
-            if len(self.s_scaling) != len(stims) or len(self.s_baseline) != len(stims):
-                 raise ValueError(f"stim={stim!r}: size of stimulus scaling: {len(self.s_scaling)} and/or baseline: "
-                                  f"{len(self.s_baseline)} is not compatible with added stimulus")
-            for s, m, scale in zip(stims, self.s_baseline, self.s_scaling):
+        if self.s_baseline is not None:
+            if len(self.s_baseline) != len(stims):
+                raise ValueError(f"stim={stim!r}: incompatible with baseline={self.s_baseline!r}")
+            for s, m in zip(stims, self.s_baseline):
                 s -= m
+        if self.s_scaling is not None:
+            if len(self.s_scaling) != len(stims):
+                raise ValueError(f"stim={stim!r}: incompatible with scaling={self.s_scaling!r}")
+            for s, scale in zip(stims, self.s_scaling):
                 s /= scale
 
         if self.tstep is None:
@@ -477,8 +480,7 @@ class DstRF:
             obj.__dict__.update({key: self.__dict__.get(key, None)})
         return obj
 
-    _PICKLE_ATTRS = ('_basis', '_cv_info', '_name', '_stim_is_single', '_stim_dims', '_stim_names', '_stim_baseline',
-                     '_stim_scaling', 'source', 'space', 'theta', 'tstart', 'tstep', 'tstop')
+    _PICKLE_ATTRS = ('_basis', '_cv_info', '_name', '_stim_is_single', '_stim_dims', '_stim_names', '_stim_baseline', '_stim_scaling', 'lead_field_scaling', 'residual', 'source', 'space', 'theta', 'tstart', 'tstep', 'tstop')
 
     def __getstate__(self):
         return {k: getattr(self, k) for k in self._PICKLE_ATTRS}
@@ -500,7 +502,6 @@ class DstRF:
         # model data covariance
         sigma_b = self.noise_covariance + self.eta * np.dot(self.lead_field, self.lead_field.T)
         self.init_sigma_b = sigma_b
-        return self
 
     def _init_iter(self, data):
         if self.space:
@@ -518,15 +519,12 @@ class DstRF:
         self.theta = np.zeros((len(self.source) * dc, data._n_predictor_variables * data.basis.shape[1]),
                               dtype=np.float64)
 
-        return self
-
     def _set_mu(self, mu, data):
         self.mu = mu
         self._init_iter(data)
         data._precompute()
         if mu == 0.0:
             self._solve(data, self.theta, n_iterc=30)
-        return self
 
     def _solve(self, data, theta, idx=slice(None, None), n_iterc=None):
         """Champagne steps implementation
@@ -610,8 +608,6 @@ class DstRF:
 
             self.Gamma[key] = gamma
             self.Sigma_b[key] = sigma_b
-
-        return self
 
     def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-4, verbose=False, use_ES=False, mus=None, n_splits=None, n_workers=None, debug=False):
         """cTRF estimator implementation
@@ -725,9 +721,8 @@ class DstRF:
         self._stim_is_single = data._stim_is_single
         self._stim_dims = data._stim_dims
         self._stim_names = data._stim_names
-        if self._stim_is_single:
-            self._stim_baseline = data.s_baseline[0] if data.s_baseline else None
-            self._stim_scaling = data.s_scaling[0] if data.s_scaling else None
+        self._stim_baseline = data.s_baseline
+        self._stim_scaling = data.s_scaling
         self._basis = data.basis
         self.tstart = data.tstart
         self.tstep = data.tstep
@@ -839,6 +834,16 @@ class DstRF:
             v = v + 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
 
         return v / len(data)
+
+    @LazyProperty
+    def h_scaled(self):
+        """h with original stimulus scale restored"""
+        if self._stim_scaling is None:
+            return self.h
+        elif self._stim_is_single:
+            return self.h * self._stim_scaling[0]
+        else:
+            return [h * s for h, s in zip(self.h, self._stim_scaling)]
 
     @LazyProperty
     def h(self):
