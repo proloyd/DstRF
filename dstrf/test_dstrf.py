@@ -71,15 +71,12 @@ def test_dstrf(cmdopt):
     # check output
     assert math.isclose(h.norm('time').norm('source').norm('space'),  4.790530198560318e-10, rel_tol=0.05)
 
-    # if cmdopt:
-    #     kwargs['mu'] = 'auto'
-    #     kwargs['normalize'] = 'l1'
-    #     kwargs['n_workers'] = 1
-    #     with catch_warnings():
-    #         filterwarnings('ignore', category=UserWarning)
-    #         model = dstrf(*args, **kwargs)
-    #     assert math.isclose(model.mu,  0.0019444, rel_tol=0.1)
-
-
-
+    if cmdopt:
+        kwargs['mu'] = 'auto'
+        kwargs['normalize'] = 'l1'
+        kwargs['n_workers'] = 1
+        with catch_warnings():
+            filterwarnings('ignore', category=UserWarning)
+            model = dstrf(*args, **kwargs)
+        assert math.isclose(model.mu,  0.0019444, rel_tol=0.1)
 

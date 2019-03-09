@@ -1,5 +1,7 @@
 import pytest
 
+_Dict = {'True': True, 'False': False}
+
 # decide on cross-validation test from command line
 def pytest_addoption(parser):
     parser.addoption(
@@ -9,4 +11,4 @@ def pytest_addoption(parser):
 
 @pytest.fixture
 def cmdopt(request):
-    return request.config.getoption("--crossvalidation")
+    return _Dict.get(request.config.getoption("--crossvalidation"), None)
