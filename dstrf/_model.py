@@ -837,6 +837,16 @@ class DstRF:
         return v / len(data)
 
     @LazyProperty
+    def h_scaled(self):
+        """h with original stimulus scale restored"""
+        if self._stim_scaling is None:
+            return self.h
+        elif self._stim_is_single:
+            return self.h * self._stim_scaling[0]
+        else:
+            return [h * s for h, s in zip(self.h, self._stim_scaling)]
+
+    @LazyProperty
     def h(self):
         """The spatio-temporal response function as (list of) NDVar"""
         n_vars = sum(len(dim) if dim else 1 for dim in self._stim_dims)
