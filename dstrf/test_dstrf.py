@@ -48,8 +48,8 @@ def test_dstrf(cmdopt):
     assert math.isclose(model.residual, 156.95094623225265, rel_tol=0.05)
     # check scaling
     stim_baseline = data['stim'].mean()
-    assert model._stim_baseline == stim_baseline
-    assert model._stim_scaling == (data['stim'] - stim_baseline).abs().mean()
+    assert model._stim_baseline[0] == stim_baseline
+    assert model._stim_scaling[0] == (data['stim'] - stim_baseline).abs().mean()
     h = model.h
     # check output
     assert math.isclose(h.norm('time').norm('source').norm('space'), 4.350744967130074e-10, rel_tol=0.05)
@@ -57,9 +57,8 @@ def test_dstrf(cmdopt):
     kwargs['normalize'] = 'l2'
     model = dstrf(*args, **kwargs)
     # check scaling
-    stim_baseline = data['stim'].mean()
-    assert model._stim_baseline == stim_baseline
-    assert model._stim_scaling == (data['stim'] - stim_baseline).std()
+    assert model._stim_baseline[0] == data['stim'].mean()
+    assert model._stim_scaling[0] == data['stim'].std()
     h = model.h
     # check output
     assert math.isclose(h.norm('time').norm('source').norm('space'),  4.790530198560318e-10, rel_tol=0.05)

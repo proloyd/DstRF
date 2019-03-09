@@ -722,9 +722,8 @@ class DstRF:
         self._stim_is_single = data._stim_is_single
         self._stim_dims = data._stim_dims
         self._stim_names = data._stim_names
-        if self._stim_is_single:
-            self._stim_baseline = data.s_baseline[0] if data.s_baseline else None
-            self._stim_scaling = data.s_scaling[0] if data.s_scaling else None
+        self._stim_baseline = data.s_baseline
+        self._stim_scaling = data.s_scaling
         self._basis = data.basis
         self.tstart = data.tstart
         self.tstep = data.tstep
