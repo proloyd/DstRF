@@ -41,6 +41,7 @@ def mp_worker(fun, shared_job_q, shared_result_q, nprocs):
     time.sleep(0.1)
     shared_result_q.put(None)
 
+
 class collect_output(Process):
     def __init__(self, N, result_q):
         Process.__init__(self)
