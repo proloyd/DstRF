@@ -18,6 +18,9 @@ from ._crossvalidation import crossvalidate
 from . import opt
 from .dsyevh3C import compute_gamma_c
 
+import logging
+logger = logging.getLogger("dstrf")
+
 _R_tol = np.finfo(np.float64).eps
 
 
@@ -609,7 +612,7 @@ class DstRF:
             self.Gamma[key] = gamma
             self.Sigma_b[key] = sigma_b
 
-    def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-4, verbose=False, use_ES=False, mus=None, n_splits=None, n_workers=None, debug=False):
+    def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-4, verbose=False, use_ES=False, mus=None, n_splits=None, n_workers=None):
         """cTRF estimator implementation
 
         Estimate both TRFs and source variance from the observed MEG data by solving
@@ -644,8 +647,6 @@ class DstRF:
             k value used in k-fold cross-validation
         n_workers : int
             number of workers to be used for cross-validation
-        debug : bool
-            Print debugging information.
 
         ..[1] Lim, Chinghway, and Bin Yu. "Estimation stability with cross-validation (ESCV)."
         Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
@@ -661,8 +662,11 @@ class DstRF:
         if do_crossvalidation:
             if mus == 'auto':
                 mus = self._auto_mu(data)
+            logger.info('Crossvalidation initiated!')
             cvmu, esmu, cv_info = crossvalidate(self, data, mus, n_splits, n_workers)
             self._cv_info = cv_info
+            if cv_info[-1]:
+                logger.warning(cv_info[-1])
             self._crossvalidated = True
             if use_ES:
                 mu = esmu
@@ -693,8 +697,7 @@ class DstRF:
 
         # run iterations
         for i in iter_o:
-            if debug:
-                print('iteration: %i:' % i)
+            logger.info(f'iteration:{i}:')
             funct, grad_funct = self._construct_f(data)
             Theta = Fasta(funct, g_funct, grad_funct, prox_g, n_iter=self.n_iterf)
             Theta.learn(theta)
@@ -703,8 +706,7 @@ class DstRF:
             theta = Theta.coefs_
             self.theta = theta
 
-            if debug:
-                print('objective after fasta: %10f' % self.eval_obj(data))
+            logger.info('objective after fasta: %10f' % self.eval_obj(data))
 
             if self.err[-1] < tol:
                 break
@@ -713,9 +715,9 @@ class DstRF:
 
             if verbose:
                 self.objective_vals.append(self.eval_obj(data))
-            if debug:
-                print("objective value after champ:{:10f}\n "
-                      "%% change:{:2f}".format(self.objective_vals[-1], self.err[-1]*100))
+
+            logger.info("objective value after champ:{:10f} %% change:{:2f}".format(self.objective_vals[-1],
+                                                                                    self.err[-1]*100))
 
         self.residual = self.eval_obj(data)
         self._stim_is_single = data._stim_is_single
