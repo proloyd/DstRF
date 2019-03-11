@@ -8,6 +8,7 @@ from numpy.core.umath_tests import inner1d
 from scipy import linalg
 from math import sqrt, log10
 from tqdm import tqdm
+from multiprocessing import current_process
 
 # eelbrain imports
 from eelbrain import UTS, NDVar
@@ -19,7 +20,6 @@ from . import opt
 from .dsyevh3C import compute_gamma_c
 
 import logging
-logger = logging.getLogger("dstrf")
 
 _R_tol = np.finfo(np.float64).eps
 
@@ -652,6 +652,7 @@ class DstRF:
         Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
         """
         # pre-whiten the object itself
+        logger = logging.getLogger(__name__)
         if self._whitening_filter is None:
             self._prewhiten()
         # pre-whiten data
@@ -688,16 +689,19 @@ class DstRF:
 
         theta = self.theta
 
+        myname = current_process().name
+
         self.err = []
+        interim_o = []
+        self.objective_vals = []
         if verbose:
-            self.objective_vals = []
             iter_o = tqdm(range(self.n_iter))
         else:
             iter_o = range(self.n_iter)
 
+        logger.debug('process:iteration \t after fasta \t after champ \t %% change')
         # run iterations
         for i in iter_o:
-            logger.info(f'iteration:{i}:')
             funct, grad_funct = self._construct_f(data)
             Theta = Fasta(funct, g_funct, grad_funct, prox_g, n_iter=self.n_iterf)
             Theta.learn(theta)
@@ -706,18 +710,16 @@ class DstRF:
             theta = Theta.coefs_
             self.theta = theta
 
-            logger.info('objective after fasta: %10f' % self.eval_obj(data))
+            interim_o.append(self.eval_obj(data))
 
             if self.err[-1] < tol:
                 break
 
             self._solve(data, theta)
 
-            if verbose:
-                self.objective_vals.append(self.eval_obj(data))
+            self.objective_vals.append(self.eval_obj(data))
 
-            logger.info("objective value after champ:{:10f} %% change:{:2f}".format(self.objective_vals[-1],
-                                                                                    self.err[-1]*100))
+            logger.debug(f'{myname}:{i} \t {interim_o[-1]} \t {self.objective_vals[-1]} \t {self.err[-1]*100}')
 
         self.residual = self.eval_obj(data)
         self._stim_is_single = data._stim_is_single
