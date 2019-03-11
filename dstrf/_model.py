@@ -149,7 +149,7 @@ def _inv_sqrtm(m):
     ind = (e > tol)
     y = np.zeros(e.shape)
     y[ind] = 1 / e[ind]
-    return np.dot(v * np.sqrt(y), v.T.conj())
+    return np.matmul(v * np.sqrt(y), v.T.conj())
 
 
 def _compute_gamma_i(z, x):
@@ -203,7 +203,8 @@ def _compute_gamma_ip(z, x, gamma):
     gamma : ndarray
         place where Gamma_i is updated
     """
-    a = np.dot(x, x.T)
+    assert x.shape[0] == 3
+    a = np.matmul(x, x.T)
     compute_gamma_c(z, a, gamma)
     return
 
@@ -342,9 +343,9 @@ class REG_Data:
         self._bE = []
         self._EtE = []
         for b, E in self:
-            self._bbt.append(np.dot(b, b.T))
-            self._bE.append(np.dot(b, E))
-            self._EtE.append(np.dot(E.T, E))
+            self._bbt.append(np.matmul(b, b.T))
+            self._bE.append(np.matmul(b, E))
+            self._EtE.append(np.matmul(E.T, E))
 
     def __iter__(self):
         return zip(self.meg, self.covariates)
@@ -495,7 +496,7 @@ class DstRF:
     def _prewhiten(self):
         wf = _inv_sqrtm(self.noise_covariance)
         self._whitening_filter = wf
-        self.lead_field = np.dot(wf, self.lead_field)
+        self.lead_field = np.matmul(wf, self.lead_field)
         self.noise_covariance = np.eye(self.lead_field.shape[0], dtype=np.float64)
         self.lead_field_scaling = linalg.norm(self.lead_field, 2)
         self.lead_field /= self.lead_field_scaling
@@ -503,7 +504,7 @@ class DstRF:
         # pre compute some necessary initializations
         self.eta = (self.lead_field.shape[0] / np.sum(self.lead_field ** 2)) * 1e-2
         # model data covariance
-        sigma_b = self.noise_covariance + self.eta * np.dot(self.lead_field, self.lead_field.T)
+        sigma_b = self.noise_covariance + self.eta * np.matmul(self.lead_field, self.lead_field.T)
         self.init_sigma_b = sigma_b
 
     def _init_iter(self, data):
@@ -559,8 +560,8 @@ class DstRF:
         for key, (meg, covariates) in enumerate(data):
             meg = meg[idx]
             covariates = covariates[idx]
-            y = meg - np.dot(np.dot(self.lead_field, theta), covariates.T)
-            Cb = np.dot(y, y.T)  # empirical data covariance
+            y = meg - np.matmul(np.matmul(self.lead_field, theta), covariates.T)
+            Cb = np.matmul(y, y.T)  # empirical data covariance
 
             try:
                 yhat = linalg.cholesky(Cb, lower=True)
@@ -584,22 +585,27 @@ class DstRF:
                     ytilde = linalg.solve(Lc, yhat)
                 except np.linalg.LinAlgError:
                     Lc = _inv_sqrtm(sigma_b)
-                    lhat = np.dot(Lc, self.lead_field)
-                    ytilde = np.dot(Lc, yhat)
+                    lhat = np.matmul(Lc, self.lead_field)
+                    ytilde = np.matmul(Lc, yhat)
 
                 # compute sigma_b for the next iteration
                 sigma_b = self.noise_covariance.copy()
 
                 for i in range(len(self.source)):
-                    # update Xi
-                    x = np.dot(gamma[i], np.dot(ytilde.T, lhat[:, i * dc:(i + 1) * dc]).T)
-
-                    # update Zi
-                    z = np.dot(lhat[:, i * dc:(i + 1) * dc].T, lhat[:, i * dc:(i + 1) * dc])
+                    if dc > 1:
+                        # update Xi
+                        x = np.matmul(gamma[i], np.matmul(ytilde.T, lhat[:, i * dc:(i + 1) * dc]).T)
+                        # update Zi
+                        z = np.matmul(lhat[:, i * dc:(i + 1) * dc].T, lhat[:, i * dc:(i + 1) * dc])
+                    else:
+                        # update Xi
+                        x = gamma[i] * np.matmul(ytilde.T, lhat[:, i * dc:(i + 1) * dc]).T
+                        # update Zi
+                        z = inner1d(lhat[:, i * dc:(i + 1) * dc], lhat[:, i * dc:(i + 1) * dc])
 
                     # update Ti
                     if dc == 1:
-                        gamma[i] = sqrt(np.dot(x, x.T)) / np.real(sqrt(z))
+                        gamma[i] = sqrt(inner1d(x, x)) / np.real(sqrt(z))
                     elif dc == 3:
                             _compute_gamma_ip(z, x, gamma[i])
                     else:
@@ -751,18 +757,18 @@ class DstRF:
                 bbts.append(np.trace(linalg.solve(L, linalg.solve(L, data._bbt[i]).T)))
             except np.linalg.LinAlgError:
                 Linv = _inv_sqrtm(self.Sigma_b[i])
-                leadfields.append(np.dot(Linv, self.lead_field))
-                bEs.append(np.dot(Linv, data._bE[i]))
-                bbts.append(np.trace(np.dot(Linv, np.dot(Linv, data._bbt[i]).T)))
+                leadfields.append(np.matmul(Linv, self.lead_field))
+                bEs.append(np.matmul(Linv, data._bE[i]))
+                bbts.append(np.trace(np.matmul(Linv, np.matmul(Linv, data._bbt[i]).T)))
 
         def f(L, x, bbt, bE, EtE):
-            Lx = np.dot(L, x)
-            y = bbt - 2 * np.sum(inner1d(bE, Lx)) + np.sum(inner1d(Lx, np.dot(Lx, EtE)))
+            Lx = np.matmul(L, x)
+            y = bbt - 2 * np.sum(inner1d(bE, Lx)) + np.sum(inner1d(Lx, np.matmul(Lx, EtE)))
             return 0.5 * y
 
         def gradf(L, x, bE, EtE):
-            y = bE - np.dot(np.dot(L, x), EtE)
-            return -np.dot(L.T, y)
+            y = bE - np.matmul(np.matmul(L, x), EtE)
+            return -np.matmul(L.T, y)
 
         def funct(x):
             fval = 0.0
@@ -792,7 +798,7 @@ class DstRF:
         """
         v = 0
         for key, (meg, covariate) in enumerate(data):
-            y = meg - np.dot(np.dot(self.lead_field, self.theta), covariate.T)
+            y = meg - np.matmul(np.matmul(self.lead_field, self.theta), covariate.T)
             L = linalg.cholesky(self.Sigma_b[key], lower=True)
             y = linalg.solve(L, y)
             v = v + 0.5 * (y ** 2).sum() + np.log(np.diag(L)).sum()
@@ -812,7 +818,7 @@ class DstRF:
         """
         v = 0
         for key, (meg, covariate) in enumerate(data):
-            y = meg - np.dot(np.dot(self.lead_field, self.theta), covariate.T)
+            y = meg - np.matmul(np.matmul(self.lead_field, self.theta), covariate.T)
             L = linalg.cholesky(self.Sigma_b[key], lower=True)
             y = linalg.solve(L, y)
             v = v + 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
@@ -832,7 +838,7 @@ class DstRF:
         """
         v = 0
         for key, (meg, covariate) in enumerate(data):
-            y = meg - np.dot(np.dot(self.lead_field, self.theta), covariate.T)
+            y = meg - np.matmul(np.matmul(self.lead_field, self.theta), covariate.T)
             # L = linalg.cholesky(self.Sigma_b[key], lower=True)
             # y = linalg.solve(L, y)
             v = v + 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
@@ -919,7 +925,7 @@ class DstRF:
         for model in models:
             y = np.empty(0)
             for trial in range(len(data)):
-                y = np.append(y, np.dot(np.dot(model.lead_field, model.theta), data.covariates[trial].T))
+                y = np.append(y, np.matmul(np.matmul(model.lead_field, model.theta), data.covariates[trial].T))
             Y.append(y)
         Y = np.array(Y)
         Y_bar = Y.mean(axis=0)
