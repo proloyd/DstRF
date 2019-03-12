@@ -111,7 +111,7 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
         Contains evaluated cross-validation metrics for ``mus``.
     """
     if n_workers is None:
-        n_workers = int(round(cpu_count()/2))
+        n_workers = int(round(cpu_count()/8))
 
     fun = model._get_cvfunc(data, n_splits)
 
