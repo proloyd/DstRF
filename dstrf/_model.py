@@ -548,6 +548,7 @@ class DstRF:
         of multiple correlated neural sources using MEG,” NeuroImage, vol. 49,
         no. 1, pp. 641–655, 2010
         """
+        logger = logging.getLogger('Champagne')
         # Choose dc
         if self.space:
             dc = len(self.space)
@@ -557,7 +558,10 @@ class DstRF:
         if n_iterc is None:
             n_iterc = self.n_iterc
 
+        logger.debug('Champagne Iterations start:')
+        logger.debug(f'trial \t time taken')
         for key, (meg, covariates) in enumerate(data):
+            start = time.time()
             meg = meg[idx]
             covariates = covariates[idx]
             y = meg - np.matmul(np.matmul(self.lead_field, theta), covariates.T)
@@ -617,6 +621,8 @@ class DstRF:
 
             self.Gamma[key] = gamma
             self.Sigma_b[key] = sigma_b
+            end = time.time()
+            logger.debug(f'{key} \t {end-start}')
 
     def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-4, verbose=False, use_ES=False, mus=None, n_splits=None, n_workers=None):
         """cTRF estimator implementation

@@ -6,6 +6,8 @@ from math import sqrt
 from scipy import linalg
 import time
 
+import logging
+
 
 def _next_stepsize(deltax, deltaF):
     """A variation of spectral descent step-size selection: 'adaptive' BB method.
@@ -180,7 +182,7 @@ class Fasta:
     def __str__(self):
         return "Fast adaptive shrinkage/thresholding Algorithm instance"
 
-    def learn(self, coefs_init, tol=1e-2, verbose=0):
+    def learn(self, coefs_init, tol=1e-2, verbose=True):
         """fits the model using FASTA algorithm
 
         parameters
@@ -200,6 +202,7 @@ class Fasta:
         -------
         self
         """
+        logger = logging.getLogger("FASTA")
         coefs_current = np.copy(coefs_init)
         grad_current = self.grad(coefs_current)
         coefs_next = coefs_current + 0.01 * np.random.randn(coefs_current.shape[0], coefs_current.shape[1])
@@ -207,7 +210,7 @@ class Fasta:
         tau_current = _next_stepsize(coefs_next - coefs_current, grad_next - grad_current)
 
         self._funcValues.append(self.f(coefs_current))
-        if verbose == 1:
+        if verbose:
             self.objective = []
             self.objective.append(self._funcValues[-1] + self.g(coefs_current))
             self.initial_stepsize = np.copy(tau_current)
@@ -215,6 +218,7 @@ class Fasta:
             self.backtracks = []
 
         start = time.time()
+        logger.debug(f"Iteration \t objective value \t step-size \t backtracking steps taken \t residual")
         for i in range(self.n_iter):
             coefs_next, objective_next, sub_grad, tau, n_backtracks = _update_coefs(coefs_current, tau_current,
                                                                                     grad_current, self.prox, self.f,
@@ -234,16 +238,11 @@ class Fasta:
             # Find step size for next iteration
             tau_next = _next_stepsize(delta_coef, delta_grad)
 
-            if verbose == 1:
+            if verbose:
                 self.stepsizes.append(tau)
                 self.backtracks.append(n_backtracks)
                 self.objective.append(objective_next + self.g(coefs_next))
-                print("Iteration : {:}, objective value : {:f}, "
-                      "stepsize : {:f}, backtracking steps taken: {:}, "
-                      "residual : {:f} \n".format(i + 1, self.objective[i],
-                                                  self.stepsizes[i],
-                                                  self.backtracks[i],
-                                                  self.residuals[i]))
+                logger.debug(f"{i} \t {self.objective[i]} \t {self.stepsizes[i]} \t {self.backtracks[i]} \t {self.residuals[i]}")
 
             # Prepare for next iteration
             coefs_current = coefs_next
@@ -260,4 +259,4 @@ class Fasta:
         self.coefs_ = coefs_current
         self.objective_value = objective_next + self.g(coefs_current)
         if verbose:
-            print("total time elapsed : {:f}s".format(end - start))
+            logger.debug(f"total time elapsed : {end - start}s")
