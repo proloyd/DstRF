@@ -36,6 +36,8 @@ ctypedef cnp.float64_t FLOAT64
 cdef Py_ssize_t I = 3
 cdef Py_ssize_t J = 3
 
+cdef float r_TOL = 2e-16
+
 
 cdef extern from "dsyevh3.c":
     int dsyevh3(double A[3][3], double Q[3][3], double w[3])
@@ -164,10 +166,14 @@ def compute_gamma_c(FLOAT64[:, :] zpy, FLOAT64[:, :] xpy, FLOAT64[:, :] gamma):
     cdef double u[3][3]
     cdef double temp[3][3]
 
+    cdef double max_elem, TOL_e, TOL_d
+
     dsyevh3(z, v, e)
+    max_elem = max(e, 3)
+    TOL_e = r_TOL * max_elem
 
     for i in range(3):
-        if e[i] < 0:
+        if e[i] < TOL_e:
             e[i] = 0
         else:
             e[i] = sqrt(e[i])
@@ -180,9 +186,11 @@ def compute_gamma_c(FLOAT64[:, :] zpy, FLOAT64[:, :] xpy, FLOAT64[:, :] gamma):
             temp[i][j] = e[i] * x[i][j] * e[j]
 
     dsyevh3(temp, u, d)
+    max_elem = max(d, 3)
+    TOL_d = r_TOL * max_elem
 
     for i in range(3):
-        if d[i] < 0:
+        if d[i] < TOL_d:
             d[i] = 0
         else:
             d[i] = sqrt(d[i])
@@ -207,3 +215,12 @@ def compute_gamma_c(FLOAT64[:, :] zpy, FLOAT64[:, :] xpy, FLOAT64[:, :] gamma):
             gamma[i, j] = x[i][j]
 
     return
+
+
+cdef max(double* x, int n):
+    cdef int i
+    cdef double max_elem = x[0]
+    for i in range(1, n):
+        if x[i] > max_elem:
+            max_elem = x[i]
+    return max_elem
