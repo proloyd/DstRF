@@ -2,7 +2,7 @@ import time
 import warnings
 import numpy as np
 from scipy import signal
-from multiprocessing import Process, Queue, cpu_count, current_process
+from multiprocessing import Process, Queue, current_process
 import queue
 from math import ceil
 from tqdm import tqdm
@@ -110,7 +110,9 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
         Contains evaluated cross-validation metrics for ``mus``.
     """
     if n_workers is None:
-        n_workers = ceil(cpu_count()/8)
+        from eelbrain._config import CONFIG
+        n = CONFIG['n_workers'] or 1  # by default this is cpu_count()
+        n_workers = ceil(n / 8)
 
     fun = model._get_cvfunc(data, n_splits)
 
