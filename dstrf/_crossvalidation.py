@@ -1,5 +1,4 @@
 import time
-import copy
 import warnings
 import numpy as np
 from scipy import signal
@@ -93,7 +92,7 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     ----------
     model: model instance
         the model to be validated, here `DstRF`. In addition to that it needs to
-        support `copy.copy` function.
+        support the :func:`copy.copy` function.
     data: REGdata
         Data.
     mus: list | ndarray  (floats)
