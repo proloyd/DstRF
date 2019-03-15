@@ -75,8 +75,9 @@ def test_dstrf(cmdopt):
         kwargs['mu'] = 'auto'
         kwargs['normalize'] = 'l1'
         kwargs['n_workers'] = 1
+        kwargs['n_iter'] = 1
         with catch_warnings():
             filterwarnings('ignore', category=UserWarning)
             model = dstrf(*args, **kwargs)
-        assert math.isclose(model.mu,  0.0019444, rel_tol=0.1)
+        assert math.isclose(model.mu,  0.004189072614241524, rel_tol=0.1)
 

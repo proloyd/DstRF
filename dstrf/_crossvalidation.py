@@ -1,17 +1,21 @@
+import os
 import time
-import copy
 import warnings
-import numpy as np
-from scipy import signal
-from multiprocessing import Process, Queue, cpu_count, current_process
+from multiprocessing import Process, Queue, current_process
 import queue
 from math import ceil
+
+from eelbrain._config import CONFIG
+import numpy as np
+from scipy import signal
 from tqdm import tqdm
 
 
 def naive_worker(fun, job_q, result_q):
     """Worker function"""
     # myname = current_process().name
+    if CONFIG['nice']:
+        os.nice(CONFIG['nice'])
     while True:
         try:
             job = job_q.get_nowait()
@@ -93,7 +97,7 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     ----------
     model: model instance
         the model to be validated, here `DstRF`. In addition to that it needs to
-        support `copy.copy` function.
+        support the :func:`copy.copy` function.
     data: REGdata
         Data.
     mus: list | ndarray  (floats)
@@ -111,7 +115,8 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
         Contains evaluated cross-validation metrics for ``mus``.
     """
     if n_workers is None:
-        n_workers = ceil(cpu_count()/8)
+        n = CONFIG['n_workers'] or 1  # by default this is cpu_count()
+        n_workers = ceil(n / 8)
 
     fun = model._get_cvfunc(data, n_splits)
 

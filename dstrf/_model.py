@@ -218,9 +218,9 @@ class REG_Data:
         Start of the TRF in seconds.
     tstop : float
         Stop of the TRF in seconds.
-    nlevels : int
+    nlevel : int
         Decides the density of Gabor atoms. Bigger nlevel -> less dense basis.
-        By default it is set to `1`. `nlevesl > 2` should be used with caution.
+        By default it is set to 1. ``nlevel > 2`` should be used with caution.
     baseline: list | None
         Mean that will be subtracted from ``stim``.
     scaling: list | None
