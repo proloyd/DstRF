@@ -1,6 +1,7 @@
 # Author: Proloy Das <proloy@umd.edu>
 import time
 import copy
+import re
 import numpy as np
 
 # Some specialized functions
@@ -677,10 +678,23 @@ class DstRF:
                 mus = self._auto_mu(data)
             logger.info('Crossvalidation initiated!')
             cvmu, esmu, cv_info = crossvalidate(self, data, mus, n_splits, n_workers)
-            self._cv_info = cv_info
             if cv_info[-1]:
                 logger.warning(cv_info[-1])
+                match = re.match(r'CVmu\s+', cv_info[-1])
+                if match is not None:
+                    logger.warning('using different mus for cross-validation')
+                    if re.match(r'right\s+', cv_info[-1]):
+                        right_point = mus[-1]
+                        mus = np.logspace(np.log10(right_point), np.log10(right_point) + 1, 4)
+                    else:
+                        left_point = mus[0]
+                        mus = np.logspace(np.log10(left_point) - 1, np.log10(left_point), 4)
+                    cvmu, esmu, cv_info_ = crossvalidate(self, data, mus, n_splits, n_workers)
+                    cv_info = cv_info + cv_info_
+                    if cv_info_[-1]:
+                        logger.warning(cv_info_[-1])
             self._crossvalidated = True
+            self._cv_info = cv_info
             if use_ES:
                 mu = esmu
             else:

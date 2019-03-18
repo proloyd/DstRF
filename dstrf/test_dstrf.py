@@ -79,5 +79,5 @@ def test_dstrf(cmdopt):
         with catch_warnings():
             filterwarnings('ignore', category=UserWarning)
             model = dstrf(*args, **kwargs)
-        assert math.isclose(model.mu,  0.004189072614241524, rel_tol=0.1)
+        assert math.isclose(model.mu,   9.025083359181292e-06, rel_tol=0.1)
 
