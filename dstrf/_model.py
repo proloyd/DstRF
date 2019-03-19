@@ -680,15 +680,10 @@ class DstRF:
             cvmu, esmu, cv_info = crossvalidate(self, data, mus, n_splits, n_workers)
             if cv_info[-1]:
                 logger.warning(cv_info[-1])
-                match = re.match(r'CVmu\s+', cv_info[-1])
-                if match is not None:
-                    logger.warning('using different mus for cross-validation')
-                    if re.match(r'right\s+', cv_info[-1]):
-                        right_point = mus[-1]
-                        mus = np.logspace(np.log10(right_point), np.log10(right_point) + 1, 4)
-                    else:
-                        left_point = mus[0]
-                        mus = np.logspace(np.log10(left_point) - 1, np.log10(left_point), 4)
+                if cvmu == mus[-1] or cvmu == mus[0]:
+                    logger.info('using different mus for cross-validation')
+                    mus = np.logspace(np.log10(cvmu), np.log10(cvmu) + 1, 4) if cvmu == mus[-1] \
+                        else np.logspace(np.log10(cvmu) - 1, np.log10(cvmu), 4)
                     cvmu, esmu, cv_info_ = crossvalidate(self, data, mus, n_splits, n_workers)
                     cv_info = cv_info + cv_info_
                     if cv_info_[-1]:
@@ -1022,3 +1017,34 @@ class DstRF:
         hi = log10(np.percentile(norm, p))
         lo = hi - 2
         return np.logspace(lo, hi, 7)
+
+    def cv_info(self):
+        if self._crossvalidated is False:
+            raise ValueError(f'CV: no cross-validation was performed.'
+                             f'Try mu=\'auto\' to perform cross-validation.')
+        mus = np.empty(0)
+        cf = np.empty(0)
+        l2_e = np.empty(0)
+        wl2_e = np.empty(0)
+        es = np.empty(0)
+        for info in self._cv_info:
+            if isinstance(info, np.ndarray):
+                mus = np.concatenate((mus, info[0]))
+                cf = np.concatenate((cf, info[2]))
+                l2_e = np.concatenate((l2_e, info[3]))
+                wl2_e = np.concatenate((wl2_e, info[1]))
+                es = np.concatenate((es, info[4]))
+        idx = mus.argsort()
+        for elem in [mus, cf, l2_e, wl2_e, es]:
+            elem[:] = elem[idx][:]
+        print(f'    mu    \t cross-fit \t  l2-error \t wl2-error \t ES metric')
+        for row in zip(mus, cf, l2_e, wl2_e, es):
+            print(f'{row[0]:0e} \t {row[1]:4.8f} \t {row[2]:0.8f} \t' \
+                  f' {row[3]:0.8f} \t {row[4]:0.8f}')
+        print('Warnings:')
+        for info in self._cv_info:
+            if isinstance(info, str):
+                print(info)
+            elif info is None:
+                print('None')
+
