@@ -663,6 +663,8 @@ class DstRF:
         ..[1] Lim, Chinghway, and Bin Yu. "Estimation stability with cross-validation (ESCV)."
         Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
         """
+        if use_ES:
+            raise NotImplementedError
         # pre-whiten the object itself
         logger = logging.getLogger(__name__)
         if self._whitening_filter is None:
@@ -691,11 +693,8 @@ class DstRF:
                 cv_results.extend(crossvalidate(self, data, new_mus, n_splits, n_workers))
 
             self._cv_results = cv_results
-
-            if use_ES:
-                mu = esmu
-            else:
-                mu = cvmu
+            best_cv = min(cv_results, key=attrgetter('cv1'))
+            mu = best_cv.mu
         else:
             # use the passed mu
             if mu is None:
