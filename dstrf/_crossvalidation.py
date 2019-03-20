@@ -116,7 +116,7 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None, ):
     """
     if n_workers is None:
         n = CONFIG['n_workers'] or 1  # by default this is cpu_count()
-        n_workers = ceil(n / 8)
+        n_workers = ceil(n / n_splits)
 
     fun = model._get_cvfunc(data, n_splits)
 

@@ -9,7 +9,7 @@ from numpy.core.umath_tests import inner1d
 from scipy import linalg
 from math import sqrt, log10
 from tqdm import tqdm
-from multiprocessing import current_process
+from multiprocessing import current_process, Pool
 
 # eelbrain imports
 from eelbrain import UTS, NDVar
@@ -977,28 +977,47 @@ class DstRF:
         def cvfunc(mu):
             # kf = KFold(n_splits=n_splits)
             kf = TimeSeriesSplit(r=0.05, p=n_splits, d=data.basis.shape[1])
-            ll = []
-            ll1 = []
-            ll2 = []
-            for model_, (train, test) in zip(models_, kf.split(data.meg[0][0])):
-                traindata = data.timeslice(train)
-                testdata = data.timeslice(test)
-                model_.fit(traindata, mu, tol=1e-5, verbose=False)
-                ll.append(model_.eval_cv(testdata))
-                ll1.append(model_.eval_obj(testdata))
-                ll2.append(model_.eval_cv1(testdata))
+            # ll = []
+            # ll1 = []
+            # ll2 = []
+            # for model_, (train, test) in zip(models_, kf.split(data.meg[0][0])):
+            #     traindata = data.timeslice(train)
+            #     testdata = data.timeslice(test)
+            #     model_.fit(traindata, mu, tol=1e-5, verbose=False)
+            #     ll.append(model_.eval_cv(testdata))
+            #     ll1.append(model_.eval_obj(testdata))
+            #     ll2.append(model_.eval_cv1(testdata))
+            #
+            # time.sleep(0.001)
+            # # val1 = np.array(ll).mean()
+            # val1 = sum(ll) / len(ll)
+            #
+            # val2 = self.compute_ES_metric(models_, data)
+            #
+            # val3 = sum(ll1) / len(ll1)
+            #
+            # val4 = sum(ll2) / len(ll2)
+            #
+            # return {'cv': val1, 'es': val2, 'cv1': val3, 'cv2': val4}
 
-            time.sleep(0.001)
-            # val1 = np.array(ll).mean()
-            val1 = sum(ll) / len(ll)
+            split_data = [(data.timeslice(train), data.timeslice(test)) for train, test in kf.split(data.meg[0][0])]
+            def func(args):
+                model_, (traindata, testdata) = args
+                model_.fit(traindata, mu, tol=1e-5, verbose=False)
+                return model_.eval_cv(testdata), model_.eval_obj(testdata), model_.eval_cv1(testdata)
+
+            with Pool(n_splits) as p:
+                res = p.map_async(func, zip(models_, split_data))
+
+            results = res.get()
+            out = []
+            for r in zip(*results):
+                out.append(np.asanyarray(r).sum())
 
             val2 = self.compute_ES_metric(models_, data)
 
-            val3 = sum(ll1) / len(ll1)
+            return {'cv': out[0], 'es': val2, 'cv1': out[1], 'cv2': out[2]}
 
-            val4 = sum(ll2) / len(ll2)
-
-            return {'cv': val1, 'es': val2, 'cv1': val3, 'cv2': val4}
 
         return cvfunc
 
