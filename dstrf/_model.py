@@ -1,7 +1,7 @@
 # Author: Proloy Das <proloy@umd.edu>
 import time
 import copy
-import re
+from operator import attrgetter
 import numpy as np
 
 # Some specialized functions
@@ -12,11 +12,11 @@ from tqdm import tqdm
 from multiprocessing import current_process
 
 # eelbrain imports
-from eelbrain import UTS, NDVar
+from eelbrain import fmtxt, UTS, NDVar
 from eelbrain._utils import LazyProperty
 
 from ._fastac import Fasta
-from ._crossvalidation import crossvalidate
+from ._crossvalidation import CVResult, crossvalidate
 from . import opt
 from .dsyevh3C import compute_gamma_c
 
@@ -435,8 +435,7 @@ class DstRF:
         4. Access the cortical TRFs in :attr:`DstRF.h`.
     """
     _name = 'cTRFs estimator'
-    _cv_info = None
-    _crossvalidated = False
+    _cv_results = None
     # Attributes to be assigned after fit:
     _stim_is_single = None
     _stim_dims = None
@@ -485,7 +484,7 @@ class DstRF:
             obj.__dict__.update({key: self.__dict__.get(key, None)})
         return obj
 
-    _PICKLE_ATTRS = ('_basis', '_cv_info', '_name', '_stim_is_single', '_stim_dims', '_stim_names', '_stim_baseline', '_stim_scaling', 'lead_field_scaling', 'residual', 'source', 'space', 'theta', 'tstart', 'tstep', 'tstop')
+    _PICKLE_ATTRS = ('_basis', '_cv_results', '_name', '_stim_is_single', '_stim_dims', '_stim_names', '_stim_baseline', '_stim_scaling', 'lead_field_scaling', 'residual', 'source', 'space', 'theta', 'tstart', 'tstep', 'tstop')
 
     def __getstate__(self):
         return {k: getattr(self, k) for k in self._PICKLE_ATTRS}
@@ -664,6 +663,8 @@ class DstRF:
         ..[1] Lim, Chinghway, and Bin Yu. "Estimation stability with cross-validation (ESCV)."
         Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
         """
+        # if use_ES:
+        #     raise NotImplementedError
         # pre-whiten the object itself
         logger = logging.getLogger(__name__)
         if self._whitening_filter is None:
@@ -677,27 +678,51 @@ class DstRF:
             if mus == 'auto':
                 mus = self._auto_mu(data)
             logger.info('Crossvalidation initiated!')
-            cvmu, esmu, cv_info = crossvalidate(self, data, mus, n_splits, n_workers)
-            if cv_info[-1]:
-                logger.warning(cv_info[-1])
-                if cvmu == mus[-1] or cvmu == mus[0]:
-                    logger.info('using different mus for cross-validation')
-                    mus = np.logspace(np.log10(cvmu), np.log10(cvmu) + 1, 4) if cvmu == mus[-1] \
-                        else np.logspace(np.log10(cvmu) - 1, np.log10(cvmu), 4)
-                    cvmu, esmu, cv_info_ = crossvalidate(self, data, mus, n_splits, n_workers)
-                    cv_info = cv_info + cv_info_
-                    if cv_info_[-1]:
-                        logger.warning(cv_info_[-1])
-            self._crossvalidated = True
-            self._cv_info = cv_info
-            if use_ES:
-                mu = esmu
+            cv_results = crossvalidate(self, data, mus, n_splits, n_workers)
+            best_cv = min(cv_results, key=attrgetter('cross_fit'))
+            if best_cv.mu == min(mus):
+                logger.info(f'CVmu is {best_cv.mu}: extending range of mu towards left')
+                new_mus = np.logspace(np.log10(best_cv.mu) - 1, np.log10(best_cv.mu), 4)[:-1]
+            elif best_cv.mu == max(mus):
+                logger.info(f'CVmu is {best_cv.mu}: extending range of mu towards right')
+                new_mus = np.logspace(np.log10(best_cv.mu), np.log10(best_cv.mu) + 1, 4)[1:]
             else:
-                mu = cvmu
+                new_mus = None
+
+            if new_mus is not None:
+                cv_results.extend(crossvalidate(self, data, new_mus, n_splits, n_workers))
+
+            self._cv_results = cv_results
+            best_cv = min(cv_results, key=attrgetter('cross_fit'))
+            mu = best_cv.mu
+            if use_ES:
+                cv_results_ = sorted(self._cv_results, key=attrgetter('mu'))
+                if mu == cv_results[-1]:
+                    logger.info(f'CVmu is {best_cv.mu}: cannot find mu based on estimation' \
+                                f' stability criterion')
+                else:
+                    best_es = None
+                    for i, res in enumerate(cv_results_):
+                        if res.mu < mu:
+                            continue
+                        else:
+                            try:
+                                if res.mu < cv_results_[i+1].mu:
+                                    best_es = res
+                                    break
+                            except IndexError:
+                                best_es = None
+                    if best_es is None:
+                        logger.warning(f'No ES minima found: can not find mu based on estimation' 
+                                       f' stability criterion. '
+                                       f'Continuing with cross-validation only.')
+                        best_es = best_cv
+                mu = best_es.mu
+
         else:
             # use the passed mu
             if mu is None:
-                raise ValueError(f'Needs mu to be specified if do_crossvalidation is False!')
+                raise ValueError(f'mu needs mu to be specified if not \'auto\'')
 
         self._set_mu(mu, data)
 
@@ -974,7 +999,7 @@ class DstRF:
         # from sklearn.model_selection import KFold
         from ._crossvalidation import TimeSeriesSplit
 
-        def cvfunc(mu):
+        def cvfunc(mu: float) -> CVResult:
             # kf = KFold(n_splits=n_splits)
             kf = TimeSeriesSplit(r=0.05, p=n_splits, d=data.basis.shape[1])
             ll = []
@@ -989,16 +1014,13 @@ class DstRF:
                 ll2.append(model_.eval_cv1(testdata))
 
             time.sleep(0.001)
-            # val1 = np.array(ll).mean()
-            val1 = sum(ll) / len(ll)
-
-            val2 = self.compute_ES_metric(models_, data)
-
-            val3 = sum(ll1) / len(ll1)
-
-            val4 = sum(ll2) / len(ll2)
-
-            return {'cv': val1, 'es': val2, 'cv1': val3, 'cv2': val4}
+            return CVResult(
+                mu,
+                sum(ll) / len(ll),  # weighted_l2_error
+                self.compute_ES_metric(models_, data),  # estimation_stability
+                sum(ll1) / len(ll1),  # cross_fit
+                sum(ll2) / len(ll2),  # l2_error
+            )
 
         return cvfunc
 
@@ -1019,32 +1041,18 @@ class DstRF:
         return np.logspace(lo, hi, 7)
 
     def cv_info(self):
-        if self._crossvalidated is False:
-            raise ValueError(f'CV: no cross-validation was performed.'
-                             f'Try mu=\'auto\' to perform cross-validation.')
-        mus = np.empty(0)
-        cf = np.empty(0)
-        l2_e = np.empty(0)
-        wl2_e = np.empty(0)
-        es = np.empty(0)
-        for info in self._cv_info:
-            if isinstance(info, np.ndarray):
-                mus = np.concatenate((mus, info[0]))
-                cf = np.concatenate((cf, info[2]))
-                l2_e = np.concatenate((l2_e, info[3]))
-                wl2_e = np.concatenate((wl2_e, info[1]))
-                es = np.concatenate((es, info[4]))
-        idx = mus.argsort()
-        for elem in [mus, cf, l2_e, wl2_e, es]:
-            elem[:] = elem[idx][:]
-        print(f'    mu    \t cross-fit \t  l2-error \t wl2-error \t ES metric')
-        for row in zip(mus, cf, l2_e, wl2_e, es):
-            print(f'{row[0]:0e} \t {row[1]:4.8f} \t {row[2]:0.8f} \t' \
-                  f' {row[3]:0.8f} \t {row[4]:0.8f}')
-        print('Warnings:')
-        for info in self._cv_info:
-            if isinstance(info, str):
-                print(info)
-            elif info is None:
-                print('None')
-
+        if self._cv_results is None:
+            raise ValueError(f"CV: no cross-validation was performed. Use mu='auto' to perform cross-validation.")
+        table = fmtxt.Table('lllll')
+        table.cells('mu', 'cross-fit', 'l2-error', 'wl2-error', 'ES metric')
+        for result in sorted(self._cv_results, key=attrgetter('mu')):
+            table.cells(result.mu, result.cross_fit, result.l2_error, result.weighted_l2_error,
+                        result.estimation_stability)
+        # warnings
+        mus = [res.mu for res in self._cv_results]
+        warnings = []
+        if self.mu == min(mus):
+            warnings.append(f"Best mu is smallest mu")
+        if warnings:
+            table.caption(f"Warnings: {'; '.join(warnings)}")
+        return table
