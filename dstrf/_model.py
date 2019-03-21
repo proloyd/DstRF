@@ -663,8 +663,8 @@ class DstRF:
         ..[1] Lim, Chinghway, and Bin Yu. "Estimation stability with cross-validation (ESCV)."
         Journal of Computational and Graphical Statistics 25.2 (2016): 464-492.
         """
-        if use_ES:
-            raise NotImplementedError
+        # if use_ES:
+        #     raise NotImplementedError
         # pre-whiten the object itself
         logger = logging.getLogger(__name__)
         if self._whitening_filter is None:
@@ -679,13 +679,13 @@ class DstRF:
                 mus = self._auto_mu(data)
             logger.info('Crossvalidation initiated!')
             cv_results = crossvalidate(self, data, mus, n_splits, n_workers)
-            best_cv = min(cv_results, key=attrgetter('cv1'))
+            best_cv = min(cv_results, key=attrgetter('cross_fit'))
             if best_cv.mu == min(mus):
                 logger.info(f'CVmu is {best_cv.mu}: extending range of mu towards left')
-                new_mus = np.logspace(np.log10(best_cv.mu) - 1, np.log10(best_cv.mu), 4)
+                new_mus = np.logspace(np.log10(best_cv.mu) - 1, np.log10(best_cv.mu), 4)[:-1]
             elif best_cv.mu == max(mus):
                 logger.info(f'CVmu is {best_cv.mu}: extending range of mu towards right')
-                new_mus = np.logspace(np.log10(best_cv.mu), np.log10(best_cv.mu) + 1, 4)
+                new_mus = np.logspace(np.log10(best_cv.mu), np.log10(best_cv.mu) + 1, 4)[1:]
             else:
                 new_mus = None
 
@@ -693,12 +693,36 @@ class DstRF:
                 cv_results.extend(crossvalidate(self, data, new_mus, n_splits, n_workers))
 
             self._cv_results = cv_results
-            best_cv = min(cv_results, key=attrgetter('cv1'))
+            best_cv = min(cv_results, key=attrgetter('cross_fit'))
             mu = best_cv.mu
+            if use_ES:
+                cv_results_ = sorted(self._cv_results, key=attrgetter('mu'))
+                if mu == cv_results[-1]:
+                    logger.info(f'CVmu is {best_cv.mu}: cannot find mu based on estimation' \
+                                f' stability criterion')
+                else:
+                    best_es = None
+                    for i, res in enumerate(cv_results_):
+                        if res.mu < mu:
+                            continue
+                        else:
+                            try:
+                                if res.mu < cv_results_[i+1].mu:
+                                    best_es = res
+                                    break
+                            except IndexError:
+                                best_es = None
+                    if best_es is None:
+                        logger.warning(f'No ES minima found: can not find mu based on estimation' 
+                                       f' stability criterion. '
+                                       f'Continuing with cross-validation only.')
+                        best_es = best_cv
+                mu = best_es.mu
+
         else:
             # use the passed mu
             if mu is None:
-                raise ValueError(f'Needs mu to be specified if do_crossvalidation is False!')
+                raise ValueError(f'mu needs mu to be specified if not \'auto\'')
 
         self._set_mu(mu, data)
 
@@ -992,10 +1016,10 @@ class DstRF:
             time.sleep(0.001)
             return CVResult(
                 mu,
-                sum(ll) / len(ll),
-                self.compute_ES_metric(models_, data),
-                sum(ll1) / len(ll1),
-                sum(ll2) / len(ll2),
+                sum(ll) / len(ll),  # weighted_l2_error
+                self.compute_ES_metric(models_, data),  # estimation_stability
+                sum(ll1) / len(ll1),  # cross_fit
+                sum(ll2) / len(ll2),  # l2_error
             )
 
         return cvfunc
@@ -1022,12 +1046,12 @@ class DstRF:
         table = fmtxt.Table('lllll')
         table.cells('mu', 'cross-fit', 'l2-error', 'wl2-error', 'ES metric')
         for result in sorted(self._cv_results, key=attrgetter('mu')):
-            table.cells(result.mu, result.cv1, result.cv2, result.cv, result.es)
+            table.cells(result.mu, result.cross_fit, result.l2_error, result.weighted_l2_error,
+                        result.estimation_stability)
         # warnings
         mus = [res.mu for res in self._cv_results]
         warnings = []
-        best_vc = min(self._cv_results, key=attrgetter('mu'))
-        if best_vc.mu == min(mus):
+        if self.mu == min(mus):
             warnings.append(f"Best mu is smallest mu")
         if warnings:
             table.caption(f"Warnings: {'; '.join(warnings)}")
