@@ -205,6 +205,7 @@ class Fasta:
         logger = logging.getLogger("FASTA")
         coefs_current = np.copy(coefs_init)
         grad_current = self.grad(coefs_current)
+        np.random.seed(0)  # seed the random generator to get same value
         coefs_next = coefs_current + 0.01 * np.random.randn(coefs_current.shape[0], coefs_current.shape[1])
         grad_next = self.grad(coefs_next)
         tau_current = _next_stepsize(coefs_next - coefs_current, grad_next - grad_current)
