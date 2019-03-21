@@ -11,13 +11,28 @@ from tqdm import tqdm
 
 
 class CVResult:
+    """Object for storing cross-validation info
 
-    def __init__(self, mu, cv, es, cv1, cv2):
+
+    Parameters
+    ----------
+    mu: float
+        self explanatory
+    weighted_l2_error: float
+        self explanatory
+    estimation_stability: float
+        self explanatory
+    cross_fit: float
+        self explanatory
+    l2_error: float
+        self explanatory
+    """
+    def __init__(self, mu, weighted_l2_error, estimation_stability, cross_fit, l2_error):
         self.mu = mu
-        self.cv = cv
-        self.es = 10 if np.isnan(es) else es  # replace Nan values with a big number
-        self.cv1 = cv1
-        self.cv2 = cv2
+        self.weighted_l2_error = weighted_l2_error
+        self.estimation_stability = 10 if np.isnan(estimation_stability) else estimation_stability  # replace Nan values with a big number
+        self.cross_fit = cross_fit
+        self.l2_error = l2_error
 
 
 def naive_worker(fun, job_q, result_q):
