@@ -738,14 +738,13 @@ class DstRF:
         myname = current_process().name
 
         self.err = []
-        interim_o = []
         self.objective_vals = []
         if verbose:
             iter_o = tqdm(range(self.n_iter))
         else:
             iter_o = range(self.n_iter)
 
-        logger.debug('process:iteration \t after fasta \t after champ \t %% change')
+        logger.debug('process:iteration \t objective value \t %% change')
         # run iterations
         for i in iter_o:
             funct, grad_funct = self._construct_f(data)
@@ -756,8 +755,6 @@ class DstRF:
             theta = Theta.coefs_
             self.theta = theta
 
-            interim_o.append(self.eval_obj(data))
-
             if self.err[-1] < tol:
                 break
 
@@ -765,7 +762,7 @@ class DstRF:
 
             self.objective_vals.append(self.eval_obj(data))
 
-            logger.debug(f'{myname}:{i} \t {interim_o[-1]} \t {self.objective_vals[-1]} \t {self.err[-1]*100}')
+            logger.debug(f'{myname}:{i} \t {self.objective_vals[-1]} \t {self.err[-1]*100}')
 
         self.residual = self.eval_obj(data)
         self._stim_is_single = data._stim_is_single
@@ -840,7 +837,18 @@ class DstRF:
         for key, (meg, covariate) in enumerate(data):
             y = meg - np.matmul(np.matmul(self.lead_field, self.theta), covariate.T)
             L = linalg.cholesky(self.Sigma_b[key], lower=True)
-            y = linalg.solve(L, y)
+            Cb = np.matmul(y, y.T)  # empirical data covariance
+            try:
+                yhat = linalg.cholesky(Cb, lower=True)
+            except np.linalg.LinAlgError:
+                hi = y.shape[0] - 1
+                lo = max(y.shape[0] - y.shape[1], 0)
+                e, v = linalg.eigh(Cb, eigvals=(lo, hi))
+                tol = e[-1] * _R_tol
+                indices = e > tol
+                yhat = v[:, indices] * np.sqrt(e[indices])
+
+            y = linalg.solve(L, yhat)
             v = v + 0.5 * (y ** 2).sum() + np.log(np.diag(L)).sum()
 
         return v / len(data)
@@ -860,7 +868,18 @@ class DstRF:
         for key, (meg, covariate) in enumerate(data):
             y = meg - np.matmul(np.matmul(self.lead_field, self.theta), covariate.T)
             L = linalg.cholesky(self.Sigma_b[key], lower=True)
-            y = linalg.solve(L, y)
+            Cb = np.matmul(y, y.T)  # empirical data covariance
+            try:
+                yhat = linalg.cholesky(Cb, lower=True)
+            except np.linalg.LinAlgError:
+                hi = y.shape[0] - 1
+                lo = max(y.shape[0] - y.shape[1], 0)
+                e, v = linalg.eigh(Cb, eigvals=(lo, hi))
+                tol = e[-1] * _R_tol
+                indices = e > tol
+                yhat = v[:, indices] * np.sqrt(e[indices])
+
+            y = linalg.solve(L, yhat)
             v = v + 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
 
         return v / len(data)
@@ -879,8 +898,6 @@ class DstRF:
         v = 0
         for key, (meg, covariate) in enumerate(data):
             y = meg - np.matmul(np.matmul(self.lead_field, self.theta), covariate.T)
-            # L = linalg.cholesky(self.Sigma_b[key], lower=True)
-            # y = linalg.solve(L, y)
             v = v + 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
 
         return v / len(data)
