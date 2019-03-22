@@ -492,7 +492,17 @@ class DstRF:
 
     def __setstate__(self, state):
         for k in self._PICKLE_ATTRS:
-            setattr(self, k, state[k])
+            setattr(self, k, state.get(k, None))
+        # make compatible with the previous version
+        if self._cv_results is None:
+            info = state.get('_cv_info')
+            if info is not None:
+                _cv_results = []
+                for items in info:
+                    if isinstance(items, np.ndarray):
+                        for columns in items.T:
+                            _cv_results.append(CVResult(*columns[[0, 1, 4, 2, 3]]))
+                setattr(self, '_cv_results', _cv_results)
 
     def _prewhiten(self):
         wf = _inv_sqrtm(self.noise_covariance)
