@@ -45,7 +45,7 @@ def test_dstrf(cmdopt):
     args = (data['meg'], data['stim'], data['fwd_sol'], data['emptyroom'])
     kwargs = {'tstop': 1, 'normalize': 'l1', 'in_place': False, 'mu': 0.0019444,
               'verbose': True, 'n_iter': 10, 'n_iterc': 10, 'n_iterf': 100}
-    model = dstrf(*args, **kwargs)
+    model, _ = dstrf(*args, **kwargs)
     # checck residual
     assert math.isclose(model.residual, 156.95094623225265, rel_tol=0.05)
     # check scaling
@@ -63,7 +63,7 @@ def test_dstrf(cmdopt):
     assert model_2.residual == model.residual
 
     kwargs['normalize'] = 'l2'
-    model = dstrf(*args, **kwargs)
+    model, _ = dstrf(*args, **kwargs)
     # check scaling
     assert model._stim_baseline[0] == data['stim'].mean()
     assert model._stim_scaling[0] == data['stim'].std()
@@ -78,9 +78,10 @@ def test_dstrf(cmdopt):
         kwargs['n_iter'] = 1
         kwargs['n_iterc'] = 2
         kwargs['n_iterf'] = 2
+        kwargs['use_l2'] = True
         with catch_warnings():
             filterwarnings('ignore', category=UserWarning)
-            model = dstrf(*args, **kwargs)
+            model, model_ = dstrf(*args, **kwargs)
         assert math.isclose(model.mu, 0.04189072614241524, rel_tol=0.1)
 
         model.cv_info()

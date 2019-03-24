@@ -1,6 +1,8 @@
 from collections import Sequence
 from typing import List
 from math import sqrt
+from operator import attrgetter
+import copy
 
 from eelbrain import NDVar
 from mne import Covariance
@@ -15,7 +17,7 @@ DEFAULT_MUs = np.logspace(-3, -1, 7)
 def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
           n_iter=10, n_iterc=10, n_iterf=100, normalize=False, in_place=None,
           mu='auto', tol=1e-3, verbose=False, n_splits=3, n_workers=None,
-          use_ES=False):
+          use_ES=False, use_l2=False):
     """One shot function for cortical TRF localization
 
     Estimate both TRFs and source variance from the observed MEG data by solving
@@ -82,8 +84,8 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
 
     Returns
     -------
-    trf : DstRF
-        The result of the model fit.
+    models : tuple of DstRF models
+        The results of the model fit.
 
     Examples
     --------
@@ -230,7 +232,13 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     model = DstRF(lead_field, noise_cov, n_iter=n_iter, n_iterc=n_iterc, n_iterf=n_iterf)
     model.fit(ds, mu, do_crossvalidation, tol, verbose, mus=mus, n_splits=n_splits,
               n_workers=n_workers, use_ES=use_ES)
-    return model
+    model_ = None
+    if use_l2:
+        best_l2 = min(model._cv_results, key=attrgetter('l2_error'))
+        model_ = copy.copy(model)
+        model_.fit(ds, best_l2.mu, False, tol, verbose, mus=None)
+
+    return model, model_
 
 
 def get_scaling(all_stims: List[List[NDVar]], normalize: str):
