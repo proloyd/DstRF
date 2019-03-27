@@ -7,6 +7,7 @@ import numpy as np
 # Some specialized functions
 from numpy.core.umath_tests import inner1d
 from scipy import linalg
+from scipy.signal import find_peaks
 from math import sqrt, log10
 from tqdm import tqdm
 from multiprocessing import current_process
@@ -1072,11 +1073,22 @@ class DstRF:
     def cv_info(self):
         if self._cv_results is None:
             raise ValueError(f"CV: no cross-validation was performed. Use mu='auto' to perform cross-validation.")
+        cv_results = sorted(self._cv_results, key=attrgetter('mu'))
+        criteria = ('cross-fit', 'l2/mu')
+        best_mu = {criterion: self.cv_mu(criterion) for criterion in criteria}
+
         table = fmtxt.Table('lllll')
-        table.cells('mu', 'cross-fit', 'l2-error', 'wl2-error', 'ES metric')
-        for result in sorted(self._cv_results, key=attrgetter('mu')):
-            table.cells(result.mu, result.cross_fit, result.l2_error, result.weighted_l2_error,
-                        result.estimation_stability)
+        table.cells('mu', 'cross-fit', 'l2-error', 'weighted l2-error', 'ES metric')
+        table.midrule()
+        fmt = '%.5f'
+        for result in cv_results:
+            table.cell(fmtxt.stat(result.mu, fmt=fmt))
+            star = 1 if result.mu is best_mu['cross-fit'] else 0
+            table.cell(fmtxt.stat(result.cross_fit, fmt, star, 1))
+            star = 1 if result.mu is best_mu['l2/mu'] else 0
+            table.cell(fmtxt.stat(result.l2_error, fmt, star, 1))
+            table.cell(fmtxt.stat(result.weighted_l2_error, fmt=fmt))
+            table.cell(fmtxt.stat(result.estimation_stability, fmt=fmt))
         # warnings
         mus = [res.mu for res in self._cv_results]
         warnings = []
@@ -1085,3 +1097,31 @@ class DstRF:
         if warnings:
             table.caption(f"Warnings: {'; '.join(warnings)}")
         return table
+
+    def cv_mu(self, criterion='cross-fit'):
+        """Retrieve best mu based on cross-validation
+
+        Parameters
+        ----------
+        criterion : str
+            Criterion for best fit. Possible values:
+
+            - ``'cross-fit'``: The smallest cross-fit value (default)
+            - ``'l2'``: The smallest l2 error
+            - ``'l2/mu'``: The local minimum in the l2 error with smallest mu
+        """
+        if criterion == 'cross-fit':
+            best_cv = min(self._cv_results, key=attrgetter('cross_fit'))
+        elif criterion == 'l2':
+            best_cv = min(self._cv_results, key=attrgetter('l2_error'))
+        elif criterion == 'l2/mu':
+            cv_results = sorted(self._cv_results, key=attrgetter('mu'))
+            peaks, _ = find_peaks([-result.l2_error for result in cv_results])  # find local minima
+            if len(peaks) > 0:
+                # higher mu -> smaller trf
+                best_cv = max([cv_results[peak] for peak in peaks], key=attrgetter('mu'))
+            else:
+                best_cv = min(cv_results, key=attrgetter('l2_error'))
+        else:
+            raise ValueError(f'criterion={criterion}')
+        return best_cv.mu
