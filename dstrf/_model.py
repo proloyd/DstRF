@@ -635,7 +635,7 @@ class DstRF:
             end = time.time()
             logger.debug(f'{key} \t {end-start}')
 
-    def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-4, verbose=False, use_ES=False, mus=None, n_splits=None, n_workers=None):
+    def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-5, verbose=False, use_ES=False, mus=None, n_splits=None, n_workers=None):
         """cTRF estimator implementation
 
         Estimate both TRFs and source variance from the observed MEG data by solving
