@@ -59,12 +59,11 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     in_place: bool
         With ``in_place=False`` (default) the original ``meg`` and ``stims`` are left untouched;
         use ``in_place=True`` to save memory by using the original ``meg`` and ``stim``.
-    mu : 'auto' or ndarray or list or tuple
-        Choice of regularizer parameter. By default ``mu='auto'`` performs crossvalidation
-        to choose optimal one, from the range
-                ``np.logspace(-3, -1, 7)``.
-        Additionally, user can choose to pass a range over which the cross-validation will be done.
-        If a single choice if passed, model corresponding to that value is returned.
+    mu : 'auto' | float | sequence of float
+        Choice of regularizer parameters. Specify a single value to fit a model
+        corresponding to that value. Alternatively, specify a range over which
+        cross-validation will be done. By default (``mu='auto'``) a range of
+        values for cross-validation is chosen based on the data.
     tol : float
         Tolerance factor deciding stopping criterion for the overall algorithm. The iterations
         are stooped when ``norm(trf_new - trf_old)/norm(trf_old) < tol`` condition is met.
