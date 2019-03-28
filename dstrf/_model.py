@@ -689,7 +689,7 @@ class DstRF:
             if mus == 'auto':
                 mus = self._auto_mu(data)
             logger.info('Crossvalidation initiated!')
-            cv_results = crossvalidate(self, data, mus, n_splits, n_workers)
+            cv_results = crossvalidate(self, data, mus, tol, n_splits, n_workers)
             best_cv = min(cv_results, key=attrgetter('cross_fit'))
             if best_cv.mu == min(mus):
                 logger.info(f'CVmu is {best_cv.mu}: extending range of mu towards left')
@@ -1004,7 +1004,7 @@ class DstRF:
         else:
             return VarY / (Y_bar ** 2).sum()
 
-    def _get_cvfunc(self, data, n_splits):
+    def _get_cvfunc(self, data, n_splits, tol):
         """Method for creating function for crossvalidation
 
         In the cross-validation phase the workers will call this function for
@@ -1015,11 +1015,11 @@ class DstRF:
         data : object
             the instance should be compatible for fitting the model. In addition to
             that it shall have a timeslice method compatible to kfold objects.
-
         n_splits : int
             number of folds for cross-validation, If None, it will use values
             specified in config.py.
-
+        tol : float
+            tolerence parameter. Decides when to stop outer iterations.
         Returns
         -------
             callable, return the cross-validation metrics
@@ -1037,7 +1037,7 @@ class DstRF:
             for model_, (train, test) in zip(models_, kf.split(data.meg[0][0])):
                 traindata = data.timeslice(train)
                 testdata = data.timeslice(test)
-                model_.fit(traindata, mu, tol=1e-5, verbose=False)
+                model_.fit(traindata, mu, tol=tol, verbose=False)
                 ll.append(model_.eval_cv(testdata))
                 ll1.append(model_.eval_obj(testdata))
                 ll2.append(model_.eval_cv1(testdata))

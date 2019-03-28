@@ -64,7 +64,7 @@ def start_workers(fun, shared_job_q, shared_result_q, nprocs):
     return procs
 
 
-def crossvalidate(model, data, mus, n_splits, n_workers=None) -> List[CVResult]:
+def crossvalidate(model, data, mus, tol, n_splits, n_workers=None) -> List[CVResult]:
     """used to perform cross-validation of cTRF model
 
     This function assumes `model` class has method _get_cvfunc(data, n_splits)
@@ -81,6 +81,8 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None) -> List[CVResult]:
         Data.
     mus: list | ndarray  (floats)
         The range of the regularizing weights.
+    tol : float
+            tolerence parameter. Decides when to stop outer iterations.
     n_splits: int
         number of folds for cross-validation.
     n_workers: int
@@ -98,7 +100,7 @@ def crossvalidate(model, data, mus, n_splits, n_workers=None) -> List[CVResult]:
         n = CONFIG['n_workers'] or 1  # by default this is cpu_count()
         n_workers = ceil(n / 8)
 
-    fun = model._get_cvfunc(data, n_splits)
+    fun = model._get_cvfunc(data, n_splits, tol)
 
     job_q = Queue()
     result_q = Queue()
