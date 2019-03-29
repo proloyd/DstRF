@@ -13,7 +13,7 @@ DEFAULT_MUs = np.logspace(-3, -1, 7)
 
 
 def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
-          n_iter=10, n_iterc=10, n_iterf=100, normalize=False, in_place=None,
+          n_iter=10, n_iterc=10, n_iterf=100, normalize=False, in_place=False,
           mu='auto', tol=1e-3, verbose=False, n_splits=3, n_workers=None,
           use_ES=False):
     """One shot function for cortical TRF localization
@@ -115,7 +115,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     """
     # data copy?
     if not isinstance(in_place, bool):
-        raise TypeError(f"in_place={in_place!r}, need bool or None")
+        raise TypeError(f"in_place={in_place!r}, need bool")
 
     # make meg/stim representation uniform:
     meg_trials = []  # [trial_1, trial_2, ...]
