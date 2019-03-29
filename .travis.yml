@@ -1,0 +1,42 @@
+language: c
+env:
+    global: PYTHON_VERSION=3.6
+            DISPLAY=:99.0
+            TRAVIS_PYTHON_VERSION=3.6
+
+matrix:
+  include:
+    - os: osx  # https://github.com/travis-ci/travis-ci/issues/2312
+      python: 3.6
+      sudo: false
+      env: CONDA_OS="MacOSX" KMP_DUPLICATE_LIB_OK=TRUE
+    - os: linux
+      python: 3.6
+      sudo: false
+      env: CONDA_OS="Linux"
+      addons: {apt: {packages: [libwebkitgtk-dev]}}
+
+# Setup anaconda
+# https://gist.github.com/dan-blanchard/7045057
+before_install:
+  - if [ "${TRAVIS_OS_NAME}" == "linux" ]; then
+      /sbin/start-stop-daemon --start --quiet --pidfile /tmp/custom_xvfb_99.pid --make-pidfile --background --exec /usr/bin/Xvfb -- :99 -screen 0 1400x900x24 -ac +extension GLX +render -noreset;
+    fi;
+  - wget -q http://repo.continuum.io/miniconda/Miniconda3-latest-$CONDA_OS-x86_64.sh -O miniconda.sh
+  - chmod +x miniconda.sh
+  - ./miniconda.sh -b -p $HOME/miniconda
+  - export PATH=$HOME/miniconda/bin:$PATH
+  - conda update --yes -n base conda
+  - curl -O https://raw.githubusercontent.com/christianbrodbeck/Eelbrain/master/env-dev.yml
+  - conda env create -n condaenv --file env-dev.yml
+  - . $HOME/miniconda/etc/profile.d/conda.sh
+  - conda activate condaenv
+  - pip install https://github.com/christianbrodbeck/Eelbrain/archive/master.zip
+  - python -c "import mne; mne.datasets.testing.data_path()"
+  - python --version
+
+install:
+  - python setup.py develop
+
+script:
+  - pytest
