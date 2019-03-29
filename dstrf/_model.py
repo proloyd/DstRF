@@ -867,7 +867,7 @@ class DstRF:
 
         return residual / len(data)
 
-    def eval_cv(self, data):
+    def eval_wl2(self, data):
         """evaluates whole cross-validation metric (used by CV only)
 
         Parameters
@@ -898,7 +898,7 @@ class DstRF:
 
         return ll / len(data)
 
-    def eval_cv1(self, data):
+    def eval_l2(self, data):
         """evaluates Theta cross-validation metric (used by CV only)
 
         Parameters
@@ -909,12 +909,12 @@ class DstRF:
         -------
             float
         """
-        v = 0
+        l2 = 0
         for key, (meg, covariate) in enumerate(data):
             y = meg - np.matmul(np.matmul(self.lead_field, self.theta), covariate.T)
-            v = v + 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
+            l2 = l2 + 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
 
-        return v / len(data)
+        return l2 / len(data)
 
     @LazyProperty
     def h_scaled(self):
@@ -1040,9 +1040,9 @@ class DstRF:
                 traindata = data.timeslice(train)
                 testdata = data.timeslice(test)
                 model_.fit(traindata, mu, tol=tol, verbose=False)
-                ll.append(model_.eval_cv(testdata))
+                ll.append(model_.eval_wl2(testdata))
                 ll1.append(model_.eval_obj(testdata))
-                ll2.append(model_.eval_cv1(testdata))
+                ll2.append(model_.eval_l2(testdata))
 
             time.sleep(0.001)
             return CVResult(
