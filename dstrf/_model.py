@@ -846,7 +846,7 @@ class DstRF:
         -------
             float
         """
-        v = 0
+        residual = 0
         for key, (meg, covariate) in enumerate(data):
             y = meg - np.matmul(np.matmul(self.lead_field, self.theta), covariate.T)
             L = linalg.cholesky(self.Sigma_b[key], lower=True)
@@ -862,9 +862,9 @@ class DstRF:
                 yhat = v[:, indices] * np.sqrt(e[indices])
 
             y = linalg.solve(L, yhat)
-            v = v + 0.5 * (y ** 2).sum() + np.log(np.diag(L)).sum()
+            residual += 0.5 * (y ** 2).sum() + np.log(np.diag(L)).sum()
 
-        return v / len(data)
+        return residual / len(data)
 
     def eval_cv(self, data):
         """evaluates whole cross-validation metric (used by CV only)
@@ -877,7 +877,7 @@ class DstRF:
         -------
             float
         """
-        v = 0
+        ll = 0
         for key, (meg, covariate) in enumerate(data):
             y = meg - np.matmul(np.matmul(self.lead_field, self.theta), covariate.T)
             L = linalg.cholesky(self.Sigma_b[key], lower=True)
@@ -893,9 +893,9 @@ class DstRF:
                 yhat = v[:, indices] * np.sqrt(e[indices])
 
             y = linalg.solve(L, yhat)
-            v = v + 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
+            ll += 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
 
-        return v / len(data)
+        return ll / len(data)
 
     def eval_cv1(self, data):
         """evaluates Theta cross-validation metric (used by CV only)
