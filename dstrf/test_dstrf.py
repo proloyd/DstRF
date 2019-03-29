@@ -1,13 +1,10 @@
-from warnings import catch_warnings, filterwarnings
-filterwarnings('ignore', category=FutureWarning)
-
 import os
 import pickle
 from mne.utils import _fetch_file
 from dstrf import dstrf
-import math
 
 from eelbrain.testing import assert_dataobj_equal
+import pytest
 
 
 # web url to fetch the file
@@ -21,7 +18,7 @@ if os.path.isdir(dirname) is False:
     os.mkdir(dirname)
 
 
-def _load(name):
+def load(name):
     if name in names:
         fname = os.path.join(dirname, f"{name}.pickled")
         if not os.path.isfile(fname):
@@ -35,26 +32,19 @@ def _load(name):
     return v
 
 
-def load(name=names):
-    data_dict = {name_: _load(name_) for name_ in name}
-    return data_dict
-
-
-def test_dstrf(cmdopt):
-    data = load()
-    args = (data['meg'], data['stim'], data['fwd_sol'], data['emptyroom'])
-    kwargs = {'tstop': 1, 'normalize': 'l1', 'in_place': False, 'mu': 0.0019444,
-              'verbose': True, 'n_iter': 10, 'n_iterc': 10, 'n_iterf': 100}
-    model = dstrf(*args, **kwargs)
+def test_dstrf():
+    meg = load('meg').sub(time=(0, 5))
+    stim = load('stim').sub(time=(0, 5))
+    fwd = load('fwd_sol')
+    emptyroom = load('emptyroom')
+    model = dstrf(meg, stim, fwd, emptyroom, tstop=0.2, normalize='l1', mu=0.0019444, n_iter=3, n_iterc=3, n_iterf=10)
     # checck residual
-    assert math.isclose(model.residual, 156.95094623225265, rel_tol=0.05)
+    assert model.residual == pytest.approx(175.521, 0.001)
     # check scaling
-    stim_baseline = data['stim'].mean()
+    stim_baseline = stim.mean()
     assert model._stim_baseline[0] == stim_baseline
-    assert model._stim_scaling[0] == (data['stim'] - stim_baseline).abs().mean()
-    h = model.h
-    # check output
-    assert math.isclose(h.norm('time').norm('source').norm('space'), 4.350744967130074e-10, rel_tol=0.05)
+    assert model._stim_scaling[0] == (stim - stim_baseline).abs().mean()
+    assert model.h.norm('time').norm('source').norm('space') == pytest.approx(5.200e-10, rel=0.001)
 
     # test persistence
     model_2 = pickle.loads(pickle.dumps(model, pickle.HIGHEST_PROTOCOL))
@@ -62,26 +52,15 @@ def test_dstrf(cmdopt):
     assert_dataobj_equal(model_2.h_scaled, model.h_scaled)
     assert model_2.residual == model.residual
 
-    kwargs['normalize'] = 'l2'
-    model = dstrf(*args, **kwargs)
+    # normalize='l2' (otherwise identical)
+    model = dstrf(meg, stim, fwd, emptyroom, tstop=0.2, normalize='l2', mu=0.0019444, n_iter=3, n_iterc=3, n_iterf=10)
     # check scaling
-    assert model._stim_baseline[0] == data['stim'].mean()
-    assert model._stim_scaling[0] == data['stim'].std()
-    h = model.h
-    # check output
-    assert math.isclose(h.norm('time').norm('source').norm('space'),  4.790530198560318e-10, rel_tol=0.05)
 
-    if cmdopt:
-        kwargs['mu'] = 'auto'
-        kwargs['normalize'] = 'l1'
-        kwargs['n_workers'] = 1
-        kwargs['n_iter'] = 1
-        kwargs['n_iterc'] = 2
-        kwargs['n_iterf'] = 2
-        with catch_warnings():
-            filterwarnings('ignore', category=UserWarning)
-            model = dstrf(*args, **kwargs)
-        assert math.isclose(model.mu, 0.004189072614240042, rel_tol=0.1)
+    assert model._stim_baseline[0] == stim.mean()
+    assert model._stim_scaling[0] == stim.std()
+    assert model.h.norm('time').norm('source').norm('space') == pytest.approx(5.852e-10, 0.001)
 
-        model.cv_info()
-
+    # cross-validation
+    model = dstrf(meg, stim, fwd, emptyroom, tstop=0.2, normalize='l1', mu='auto', n_iter=1, n_iterc=2, n_iterf=2, n_workers=1)
+    assert model.mu == pytest.approx(0.093219, 0.001)
+    model.cv_info()
