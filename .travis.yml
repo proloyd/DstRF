@@ -32,11 +32,10 @@ before_install:
   - . $HOME/miniconda/etc/profile.d/conda.sh
   - conda activate condaenv
   - pip install https://github.com/christianbrodbeck/Eelbrain/archive/master.zip
-  - python -c "import mne; mne.datasets.testing.data_path()"
   - python --version
 
 install:
   - python setup.py develop
 
 script:
-  - pytest
+  - pytest --crossvalidation==True
