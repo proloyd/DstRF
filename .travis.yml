@@ -39,3 +39,4 @@ install:
 
 script:
   - pytest --crossvalidation=True
+
