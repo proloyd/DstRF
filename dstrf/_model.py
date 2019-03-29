@@ -708,9 +708,10 @@ class DstRF:
             mu = best_cv.mu
             if use_ES:
                 cv_results_ = sorted(self._cv_results, key=attrgetter('mu'))
-                if mu == cv_results[-1]:
-                    logger.info(f'CVmu is {best_cv.mu}: cannot find mu based on estimation' \
-                                f' stability criterion')
+                if mu == cv_results[-1].mu:
+                    logger.info(f'\nCVmu is {best_cv.mu}: could not find mu based on estimation' \
+                                f' stability criterion'
+                                f'\nContinuing with cross-validation only.')
                 else:
                     best_es = None
                     for i, res in enumerate(cv_results_):
@@ -718,17 +719,17 @@ class DstRF:
                             continue
                         else:
                             try:
-                                if res.mu < cv_results_[i+1].mu:
+                                if res.estimation_stability < cv_results_[i+1].estimation_stability:
                                     best_es = res
                                     break
                             except IndexError:
                                 best_es = None
                     if best_es is None:
-                        logger.warning(f'No ES minima found: can not find mu based on estimation' 
+                        logger.warning(f'\nNo ES minima found: could not find mu based on estimation' 
                                        f' stability criterion. '
-                                       f'Continuing with cross-validation only.')
-                        best_es = best_cv
-                mu = best_es.mu
+                                       f'\nContinuing with cross-validation only.')
+                    else:
+                        mu = best_es.mu
 
         else:
             # use the passed mu
