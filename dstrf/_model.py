@@ -702,7 +702,7 @@ class DstRF:
                 new_mus = None
 
             if new_mus is not None:
-                cv_results.extend(crossvalidate(self, data, new_mus, n_splits, n_workers))
+                cv_results.extend(crossvalidate(self, data, new_mus, tol, n_splits, n_workers))
 
             self._cv_results = cv_results
             best_cv = min(cv_results, key=attrgetter('cross_fit'))
