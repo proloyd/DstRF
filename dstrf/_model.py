@@ -615,9 +615,9 @@ class DstRF:
                         z = np.matmul(lhat[:, i * dc:(i + 1) * dc].T, lhat[:, i * dc:(i + 1) * dc])
                     else:
                         # update Xi
-                        x = gamma[i] * np.matmul(ytilde.T, lhat[:, i * dc:(i + 1) * dc]).T
+                        x = gamma[i] * np.matmul(ytilde.T, lhat[:, i]).T
                         # update Zi
-                        z = inner1d(lhat[:, i * dc:(i + 1) * dc], lhat[:, i * dc:(i + 1) * dc])
+                        z = inner1d(lhat[:, i], lhat[:, i])
 
                     # update Ti
                     if dc == 1:
