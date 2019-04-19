@@ -101,7 +101,7 @@ def _update_coefs(x, tau, gradfx, prox, f, g, beta, fk):
 
 
 class Fasta:
-    """Fast adaptive shrinkage/thresholding Algorithm
+    r"""Fast adaptive shrinkage/thresholding Algorithm
 
     Reference
     ---------
