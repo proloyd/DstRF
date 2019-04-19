@@ -69,7 +69,7 @@ def shrink(x, mu):
 
 
 def g_group(x, mu):
-    """group (l12) norm  penalty:
+    r"""group (l12) norm  penalty:
 
             gg(x) = \sum ||x_s_{i,t}||
 
