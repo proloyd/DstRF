@@ -221,9 +221,13 @@ class Fasta:
         start = time.time()
         logger.debug(f"Iteration \t objective value \t step-size \t backtracking steps taken \t residual")
         for i in range(self.n_iter):
+            try:
+                fn_max = max(self._funcValues[-10:])
+            except IndexError:
+                fn_max = max(self._funcValues)
             coefs_next, objective_next, sub_grad, tau, n_backtracks = _update_coefs(coefs_current, tau_current,
                                                                                     grad_current, self.prox, self.f,
-                                                                                    self.g, self.beta, max(self._funcValues))
+                                                                                    self.g, self.beta, fn_max)
 
             self._funcValues.append(objective_next)
 

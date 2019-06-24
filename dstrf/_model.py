@@ -636,7 +636,8 @@ class DstRF:
             end = time.time()
             logger.debug(f'{key} \t {end-start}')
 
-    def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-5, verbose=False, use_ES=False, mus=None, n_splits=None, n_workers=None):
+    def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-5, verbose=False, use_ES=False, mus=None,
+            n_splits=None, n_workers=None, use_edge_sparsity=True):
         """cTRF estimator implementation
 
         Estimate both TRFs and source variance from the observed MEG data by solving
@@ -744,8 +745,14 @@ class DstRF:
             g_funct = lambda x: g_group(x, self.mu)
             prox_g = lambda x, t: proxg_group_opt(x, self.mu * t)
         else:
-            g_funct = lambda x: g(x, self.mu)
-            prox_g = lambda x, t: shrink(x, self.mu * t)
+            if use_edge_sparsity:
+                from ._edge_sparsity import g_es, prox_g_es, create_v
+                v = create_v(self.source)
+                g_funct = lambda x: g_es(x, self.mu, v, alpha=0.05)
+                prox_g = lambda x, t: prox_g_es(x, self.mu * t, v, alpha=0.05)
+            else:
+                g_funct = lambda x: g(x, self.mu)
+                prox_g = lambda x, t: shrink(x, self.mu * t)
 
         theta = self.theta
 
