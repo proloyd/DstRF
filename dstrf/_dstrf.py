@@ -1,6 +1,5 @@
 from collections import Sequence
 from typing import List
-from math import sqrt
 
 from eelbrain import NDVar
 from mne import Covariance
@@ -240,5 +239,5 @@ def get_scaling(all_stims: List[List[NDVar]], normalize: str):
     if normalize == 'l1':
         scales = [sum(s.abs().sum('time') for s in trials) / n for trials in stim_trials]
     else:
-        scales = [sqrt(sum((s ** 2).sum('time') for s in trials) / n) for trials in stim_trials]
+        scales = [(sum((s ** 2).sum('time') for s in trials) / n) ** 0.5 for trials in stim_trials]
     return means, scales
