@@ -144,13 +144,15 @@ def _myinv(x):
     return y
 
 
-def _inv_sqrtm(m):
+def _inv_sqrtm(m, return_eig=False):
     e, v = linalg.eigh(m)
     e = e.real
     tol = _R_tol * e.max()
     ind = (e > tol)
     y = np.zeros(e.shape)
     y[ind] = 1 / e[ind]
+    if return_eig:
+        return np.matmul(v * np.sqrt(y), v.T.conj()), y[ind]
     return np.matmul(v * np.sqrt(y), v.T.conj())
 
 
@@ -858,7 +860,6 @@ class DstRF:
         residual = 0
         for key, (meg, covariate) in enumerate(data):
             y = meg - np.matmul(np.matmul(self.lead_field, self.theta), covariate.T)
-            L = linalg.cholesky(self.Sigma_b[key], lower=True)
             Cb = np.matmul(y, y.T)  # empirical data covariance
             try:
                 yhat = linalg.cholesky(Cb, lower=True)
@@ -870,8 +871,19 @@ class DstRF:
                 indices = e > tol
                 yhat = v[:, indices] * np.sqrt(e[indices])
 
-            y = linalg.solve(L, yhat)
-            residual += 0.5 * (y ** 2).sum() + np.log(np.diag(L)).sum()
+            # L = linalg.cholesky(self.Sigma_b[key], lower=True)
+            # y = linalg.solve(L, yhat)
+            sigma_b = self.Sigma_b[key]
+            try:
+                Lc = linalg.cholesky(sigma_b, lower=True)
+                y = linalg.solve(Lc, yhat)
+                logdet = np.log(np.diag(Lc)).sum()
+            except np.linalg.LinAlgError:
+                Lc, e = _inv_sqrtm(sigma_b, return_eig=True)
+                y = np.matmul(Lc, yhat)
+                logdet = - np.log(np.diag(e)).sum()
+
+            residual += 0.5 * (y ** 2).sum() + logdet
 
         return residual / len(data)
 
@@ -889,7 +901,6 @@ class DstRF:
         ll = 0
         for key, (meg, covariate) in enumerate(data):
             y = meg - np.matmul(np.matmul(self.lead_field, self.theta), covariate.T)
-            L = linalg.cholesky(self.Sigma_b[key], lower=True)
             Cb = np.matmul(y, y.T)  # empirical data covariance
             try:
                 yhat = linalg.cholesky(Cb, lower=True)
@@ -901,7 +912,16 @@ class DstRF:
                 indices = e > tol
                 yhat = v[:, indices] * np.sqrt(e[indices])
 
-            y = linalg.solve(L, yhat)
+            # L = linalg.cholesky(self.Sigma_b[key], lower=True)
+            # y = linalg.solve(L, yhat)
+            sigma_b = self.Sigma_b[key]
+            try:
+                Lc = linalg.cholesky(sigma_b, lower=True)
+                y = linalg.solve(Lc, yhat)
+            except np.linalg.LinAlgError:
+                Lc = _inv_sqrtm(sigma_b)
+                y= np.matmul(Lc, yhat)
+
             ll += 0.5 * (y ** 2).sum()  # + np.log(np.diag(L)).sum()
 
         return ll / len(data)
