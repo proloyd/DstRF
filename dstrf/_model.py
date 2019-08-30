@@ -1006,6 +1006,10 @@ class DstRF:
         else:
             return VarY / (Y_bar ** 2).sum()
 
+    def cvfunc(self, data, n_splits, tol, mu):
+        cvfun = self._get_cvfunc(data, n_splits, tol)
+        return cvfun(mu)
+
     def _get_cvfunc(self, data, n_splits, tol):
         """Method for creating function for crossvalidation
 
