@@ -5,12 +5,13 @@ shallow_clone: true
 install:
 #  - copy "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\bin\vcvars64.bat" "C:\Program Files (x86)\Microsoft Visual Studio 9.0\VC\bin\amd64\vcvarsamd64.bat"  # https://github.com/conda/conda-build/issues/1606
 #  - C:\Miniconda-x64\Scripts\activate.bat
-  - C:\Users\proloy\AppData\Local\Continuum\anaconda2\Scripts\activate.bat
-#  - conda update --yes -n base conda
-#  - curl -O https://raw.githubusercontent.com/christianbrodbeck/Eelbrain/master/env-dev.yml
-#  - conda env create -n condaenv --file env-dev.yml
+#  - C:\Users\proloy\AppData\Local\Continuum\anaconda2\Scripts\activate.bat
+  - C:\ProgramData\Miniconda3\Scripts\activate.bat
+  - conda update --yes -n base conda
+  - curl -O https://raw.githubusercontent.com/christianbrodbeck/Eelbrain/master/env-dev.yml
+  - conda env create -n condaenv --file env-dev.yml
   - conda activate condaenv
-#  - pip install https://github.com/christianbrodbeck/Eelbrain/archive/master.zip
+  - pip install https://github.com/christianbrodbeck/Eelbrain/archive/master.zip
   - python setup.py develop
 
 build: false
