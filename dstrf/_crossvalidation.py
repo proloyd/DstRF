@@ -35,7 +35,7 @@ class CVResult:
         self.l2_error = l2_error
 
 
-def naive_worker(fun, job_q, result_q):
+def naive_worker(fun, data, n_split, tol, job_q, result_q):
     """Worker function"""
     # myname = current_process().name
     if CONFIG['nice']:
@@ -45,20 +45,20 @@ def naive_worker(fun, job_q, result_q):
             job = job_q.get_nowait()
             # print('%s got %s mus...' % (myname, len(job)))
             for mu in job:
-                result_q.put(fun(mu))
+                result_q.put(fun(data, n_split, tol, mu))
             # print('%s done' % myname)
         except queue.Empty:
             # print('returning from %s process' % myname)
             return
 
 
-def start_workers(fun, shared_job_q, shared_result_q, nprocs):
+def start_workers(fun, data, n_split, tol, shared_job_q, shared_result_q, nprocs):
     """sets up workers"""
     procs = []
     for i in range(nprocs):
         p = Process(
             target=naive_worker,
-            args=(fun, shared_job_q, shared_result_q))
+            args=(fun, data, n_split, tol, shared_job_q, shared_result_q))
         procs.append(p)
         p.start()
     return procs
@@ -100,7 +100,8 @@ def crossvalidate(model, data, mus, tol, n_splits, n_workers=None) -> List[CVRes
         n = CONFIG['n_workers'] or 1  # by default this is cpu_count()
         n_workers = ceil(n / 8)
 
-    fun = model._get_cvfunc(data, n_splits, tol)
+    # fun = model._get_cvfunc(data, n_splits, tol)
+    fun = model.cvfunc
 
     job_q = Queue()
     result_q = Queue()
@@ -108,7 +109,7 @@ def crossvalidate(model, data, mus, tol, n_splits, n_workers=None) -> List[CVRes
     for mu in mus:
         job_q.put([mu])  # put the job as a list.
 
-    workers = start_workers(fun, job_q, result_q, n_workers)
+    workers = start_workers(fun, data, n_splits, tol, job_q, result_q, n_workers)
 
     results = []
     for _ in range(len(mus)):

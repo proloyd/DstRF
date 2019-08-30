@@ -1,0 +1,25 @@
+# Environment for development
+# usage: $ conda env create --file=env-dev.yml
+# to run stats test, install r-ez with $ conda install -c ncil r-ez --no-deps
+name: condaenv
+channels:
+- defaults
+- conda-forge
+dependencies:
+- python >= 3.6
+- eelbrain >= 0.30
+# building
+- setuptools >= 17
+- cython
+# docs
+- sphinx
+- sphinx-gallery
+- sphinxcontrib-bibtex
+- numpydoc
+- pydocstyle
+# testing
+- flake8
+- pytest
+- pytest-cov
+- pytest-faulthandler
+- nose

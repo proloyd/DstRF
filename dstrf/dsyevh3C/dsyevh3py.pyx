@@ -1,5 +1,6 @@
 # cython: boundscheck=False, wraparound=False
 # cython: profile=False
+# distutils: language = c++
 # distutils: include_dirs = dstrf/dsyevh3C/
 # optimized functions
 # Author: Proloy Das <proloy@umd.edu>

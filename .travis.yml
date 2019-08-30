@@ -27,11 +27,10 @@ before_install:
   - ./miniconda.sh -b -p $HOME/miniconda
   - export PATH=$HOME/miniconda/bin:$PATH
   - conda update --yes -n base conda
-  - curl -O https://raw.githubusercontent.com/christianbrodbeck/Eelbrain/master/env-dev.yml
   - conda env create -n condaenv --file env-dev.yml
   - . $HOME/miniconda/etc/profile.d/conda.sh
   - conda activate condaenv
-  - pip install https://github.com/christianbrodbeck/Eelbrain/archive/master.zip
+#  - pip install https://github.com/christianbrodbeck/Eelbrain/archive/master.zip
   - python --version
 
 install:
