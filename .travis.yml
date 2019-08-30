@@ -29,10 +29,11 @@ before_install:
   - conda update --yes -n base conda
   - curl -O https://raw.githubusercontent.com/christianbrodbeck/Eelbrain/master/env-dev.yml
   - conda env create -n condaenv --file env-dev.yml
-  - . $HOME/miniconda/etc/profile.d/conda.sh
+#  - . $HOME/miniconda/etc/profile.d/conda.sh
+  - conda create -n condaenv -c conda-forge eelbrain=0.30
   - conda activate condaenv
 #  - pip install https://github.com/christianbrodbeck/Eelbrain/archive/master.zip
-  - conda install -c christianbrodbeck eelbrain=0.29
+#  - conda install -c christianbrodbeck eelbrain=0.29
   - python --version
 
 install:
