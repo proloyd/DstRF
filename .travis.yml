@@ -32,7 +32,7 @@ before_install:
   - . $HOME/miniconda/etc/profile.d/conda.sh
   - conda activate condaenv
 #  - pip install https://github.com/christianbrodbeck/Eelbrain/archive/master.zip
- - conda install -c christianbrodbeck eelbrain=0.30b1
+ - conda install -c christianbrodbeck eelbrain=0.29
   - python --version
 
 install:
