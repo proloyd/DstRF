@@ -29,7 +29,7 @@ before_install:
   - conda update --yes -n base conda
 #  - curl -O https://raw.githubusercontent.com/christianbrodbeck/Eelbrain/master/env-dev.yml
 #  - curl -O https://raw.githubusercontent.com/christianbrodbeck/Eelbrain/r/0.30/env-dev.yml
-  - conda env create -n condaenv --file env-dev.yml --yes
+  - conda env create -n condaenv --file env-dev.yml
   - . $HOME/miniconda/etc/profile.d/conda.sh
 #  - conda create -n condaenv -c conda-forge eelbrain=0.30 --yes
   - conda activate condaenv
