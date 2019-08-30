@@ -69,3 +69,4 @@ MEG via Non-Convex Optimization](https://isr.umd.edu/Labs/CSSL/simonlab/pubs/Asi
 ## Build status
 
 [![Build Status](https://travis-ci.org/proloyd/DstRF.svg?branch=master)](https://travis-ci.org/)
+[![Build status](https://ci.appveyor.com/api/projects/status/adl418pnhugm59br/branch/master?svg=true)](https://ci.appveyor.com/project/proloyd/dstrf/branch/master)
