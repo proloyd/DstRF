@@ -486,6 +486,7 @@ class DstRF:
         return obj
 
     _PICKLE_ATTRS = ('_basis', '_cv_results', 'mu',  '_name', '_stim_is_single', '_stim_dims', '_stim_names',
+                     'noise_covariance', 'n_iter', 'n_iterc', 'n_iterf', 'lead_field',
                      '_stim_baseline', '_stim_scaling', 'lead_field_scaling', 'residual', 'source', 'space', 'theta', 'tstart', 'tstep', 'tstop')
 
     def __getstate__(self):
