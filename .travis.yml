@@ -31,8 +31,8 @@ before_install:
   - conda env create -n condaenv --file env-dev.yml
   - . $HOME/miniconda/etc/profile.d/conda.sh
   - conda activate condaenv
-  - pip install https://github.com/christianbrodbeck/Eelbrain/archive/master.zip
-#  - pip install https://github.com/christianbrodbeck/Eelbrain/archive/v0.30.zip
+#  - pip install https://github.com/christianbrodbeck/Eelbrain/archive/master.zip
+ - conda install -c christianbrodbeck eelbrain=0.30b1
   - python --version
 
 install:
