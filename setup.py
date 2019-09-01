@@ -10,25 +10,6 @@ try:
 except ImportError:
     cythonize = False
 
-# Use cython only if *.pyx files are present (i.e., not in sdist)
-# ext_paths = ('dstrf/*%s', 'dstrf/dsyevh3C/*%s')
-# if glob(ext_paths[0] % '.pyx'):
-#     from Cython.Build import cythonize
-#
-#     ext_modules = [Extension(path,
-#                              [path % '.pyx'],
-#                              extra_compile_args=['-std=c99'],
-#                              ) for path in ext_paths]
-#     ext_modules = cythonize(ext_modules)
-# else:
-#     actual_paths = []
-#     for path in ext_paths:
-#         actual_paths.extend(glob(path % '.c'))
-#     ext_modules = [
-#         Extension(path.replace(pathsep, '.')[:-2], [path])
-#         for path in actual_paths
-#     ]
-
 # Cython extensions
 ext = '.pyx' if cythonize else '.c'
 ext_cpp = '.pyx' if cythonize else '.cpp'
