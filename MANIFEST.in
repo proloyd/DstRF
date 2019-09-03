@@ -1,0 +1,5 @@
+include dstrf/dsyevh3C/*.c
+include dstrf/dsyevh3C/*.h
+include dstrf/dsyevh3C/README
+include *.txt
+recursive-include . *.pyx
