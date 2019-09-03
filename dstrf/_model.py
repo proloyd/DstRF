@@ -458,6 +458,7 @@ class DstRF:
             self.space = lead_field.get_dim('space')
         else:
             g = lead_field.get_data(dims=('sensor', 'source')).astype(np.float64)
+
             self.lead_field = g
             self.space = None
 
@@ -514,15 +515,32 @@ class DstRF:
         self.lead_field = np.matmul(wf, self.lead_field)
         self.noise_covariance = np.eye(self.lead_field.shape[0], dtype=np.float64)
         self.lead_field_scaling = linalg.norm(self.lead_field, 2)
+        # self.lead_field_scaling = 1
         self.lead_field /= self.lead_field_scaling
 
-        # pre compute some necessary initializations
-        self.eta = (self.lead_field.shape[0] / np.sum(self.lead_field ** 2)) * 1e-2
-        # model data covariance
-        sigma_b = self.noise_covariance + self.eta * np.matmul(self.lead_field, self.lead_field.T)
+        # # pre compute some necessary initializations
+        # self.eta = (self.lead_field.shape[0] / np.sum(self.lead_field ** 2)) * 1e-2
+        # # model data covariance
+        # sigma_b = self.noise_covariance + self.eta * np.matmul(self.lead_field, self.lead_field.T)
+        # self.init_sigma_b = sigma_b
+
+    def _init_from_mne(self, data):
+        eta = []
+        sigma_b = []
+        dc = len(self.space) if self.space else 1
+        for y, _ in data:
+            t = y.shape[1]
+            # import ipdb
+            # ipdb.set_trace()
+            Gamma, data_cov = mne_initialization(y * (t ** 0.5), self.lead_field)
+            Gamma = np.reshape(Gamma, (-1, dc))
+            eta.append([np.diag(g) for g in Gamma])
+            sigma_b.append(self.noise_covariance + data_cov)
+        self.eta = eta
         self.init_sigma_b = sigma_b
 
     def _init_iter(self, data):
+        import copy
         if self.space:
             dc = len(self.space)
         else:
@@ -530,9 +548,12 @@ class DstRF:
 
         self.Gamma = []
         self.Sigma_b = []
-        for _ in range(len(data)):
-            self.Gamma.append([self.eta * np.eye(dc, dtype=np.float64) for _ in range(len(self.source))])
-            self.Sigma_b.append(self.init_sigma_b.copy())
+        # for _ in range(len(data)):
+        #     self.Gamma.append([self.eta * np.eye(dc, dtype=np.float64) for _ in range(len(self.source))])
+        #     self.Sigma_b.append(self.init_sigma_b.copy())
+        for g, s in zip(self.eta, self.init_sigma_b):
+            self.Gamma.append(copy.deepcopy(g))
+            self.Sigma_b.append(s.copy())
 
         # initializing \Theta
         self.theta = np.zeros((len(self.source) * dc, data._n_predictor_variables * data.basis.shape[1]),
@@ -640,7 +661,7 @@ class DstRF:
             logger.debug(f'{key} \t {end-start}')
 
     def fit(self, data, mu='auto', do_crossvalidation=False, tol=1e-5, verbose=False, use_ES=False, mus=None,
-            n_splits=None, n_workers=None, use_edge_sparsity=True):
+            n_splits=None, n_workers=None, use_edge_sparsity=True, alpha=0.05):
         """cTRF estimator implementation
 
         Estimate both TRFs and source variance from the observed MEG data by solving
@@ -689,10 +710,16 @@ class DstRF:
         if isinstance(data, REG_Data):
             data._prewhiten(self._whitening_filter)
 
+        logger.info('Initiating from mne sol, please wait...')
+        self._init_from_mne(data)
+        logger.info('Thanks for waiting...')
+
         # take care of cross-validation
         if do_crossvalidation:
             if mus == 'auto':
                 mus = self._auto_mu(data)
+            if use_edge_sparsity:
+                mus /= 0.2 * alpha
             logger.info('Crossvalidation initiated!')
             cv_results = crossvalidate(self, data, mus, tol, n_splits, n_workers)
             best_cv = min(cv_results, key=attrgetter('cross_fit'))
@@ -750,9 +777,16 @@ class DstRF:
         else:
             if use_edge_sparsity:
                 from ._edge_sparsity import g_es, prox_g_es, create_v
-                v = create_v(self.source)
-                g_funct = lambda x: g_es(x, self.mu, v, alpha=0.05)
-                prox_g = lambda x, t: prox_g_es(x, self.mu * t, v, alpha=0.05)
+                # v = create_v(self.source)
+                # g_funct = lambda x: g_es(x, self.mu, v, alpha=alpha)
+                # prox_g = lambda x, t: prox_g_es(x, self.mu * t, v, alpha=alpha)
+                from ._edge_sparsity import prox_ADMM
+                p_admm = prox_ADMM(v=None, alpha=alpha, max_iter=100, tau1='auto', tau2=1, source=self.source)
+                g_funct = lambda x: p_admm.g_es(x, self.mu)
+                prox_g = lambda x, t: p_admm.g_es_prox(x, self.mu * t)
+                import ipdb
+                ipdb.set_trace()
+
             else:
                 g_funct = lambda x: g(x, self.mu)
                 prox_g = lambda x, t: shrink(x, self.mu * t)
@@ -1158,3 +1192,96 @@ class DstRF:
         else:
             raise ValueError(f'criterion={criterion}')
         return best_cv.mu
+
+
+def find_mu(s, y, eta=1, tol=1e-8, max_iter=1000):
+    """
+
+    :param s: singular values
+    :param y: data whitened by left eigen matrix of svd of L
+            y |-> u.T @ y
+    :param eta: SNR
+        if prewhitened use 1.
+    :param tol:
+    :param max_iter:
+    :return: mu, float
+    """
+    logger = logging.getLogger(__name__)
+    e = s ** 2
+    z = y ** 2
+    TM = z.size
+    eta = eta * TM
+    z2 = z.sum(axis=1)
+    mu = 0
+    diff = []
+
+    logger.info('please wait: calculating mu...')
+    for _ in range(max_iter):
+        temp = 1 + mu * e
+        fmu = z2 / (temp ** 2)
+        f = fmu.sum() - eta
+        dfmu = (-2) * fmu * e / temp
+        diff.append(f / dfmu.sum())
+        if (mu == 0 and f < 0) or abs(diff[-1] / diff[0]) < tol:
+            logger.info(f"thanks for waiting, (mu: {mu}) calculation complete after:"
+                        f"iteration # {len(diff)} with relative error {diff[-1] / diff[0]}")
+            return mu
+        mu -= diff[-1]
+
+    logger.info(f"maximum iteration {max_iter} reached, consider more iterations for convergence!")
+    return mu
+
+
+def wls(y, l, w, return_ecov=False):
+    w = np.squeeze(w)
+    if w.ndim == 1:
+        lw = l * w[None, :]
+    else:
+        lw = l @ w
+    u, s, vh = linalg.svd(lw, full_matrices=False)
+    yw = u.T @ y
+    mu = find_mu(s, yw, eta=1)
+    if mu:
+        gamma = s / (s ** 2 + 1 / mu)
+    else:
+        gamma = 1 / s
+
+    if w.ndim == 1:
+        im = w[:, None] * vh.T
+    else:
+        im = w @ vh.T
+
+    im = im * gamma[None, :]
+
+    if return_ecov is True:
+        ecov = np.eye(w.shape[0]) - vh.T @ ((gamma * s)[:, None] * vh)
+        ecov *= mu
+        if w.ndim == 1:
+            ecov *= w[:, None]
+            ecov *= w[None, :]
+        else:
+            ecov = ecov @ w.T
+            ecov = w @ ecov
+        return im @ yw, mu, ecov
+
+    return im @ yw, mu
+
+
+def mne_initialization(y, l, use_depth_prior=True, exp=0.8):
+    N, M = l.shape
+    T = y.shape[1]
+
+    if use_depth_prior:
+        dw = 1.0 / (l ** 2).sum(axis=0)
+        limit = dw.min() * 10.0
+        depth_weighting = (np.minimum(dw / limit, 1)) ** exp
+    else:
+        depth_weighting = np.ones(M)
+
+    w = np.ones(M)
+    w *= depth_weighting
+    inv, mu, ecov = wls(y, l, w, return_ecov=True)
+    Gamma = np.diag((inv @ inv.T) / T + ecov)
+    data_cov = l * Gamma[None, :] @ l.T
+    return Gamma, data_cov
+
