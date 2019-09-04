@@ -1,5 +1,5 @@
-from collections import Sequence
 from typing import List
+import collections
 
 from eelbrain import NDVar
 from mne import Covariance
@@ -122,7 +122,7 @@ def dstrf(meg, stim, lead_field, noise, tstart=0, tstop=0.5, nlevels=1,
     if isinstance(meg, NDVar):
         meg_list = [meg]
         stim_list = [stim]
-    elif isinstance(meg, Sequence):
+    elif isinstance(meg, collections.Sequence):
         if len(stim) != len(meg):
             raise ValueError(f"meg={meg}, stim={stim}: different length")
         meg_list = list(meg)
