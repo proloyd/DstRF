@@ -5,7 +5,7 @@ from operator import attrgetter
 import numpy as np
 
 # Some specialized functions
-# from numpy.core.umath_tests import inner1d
+from numpy.core.umath_tests import inner1d
 from scipy import linalg
 from scipy.signal import find_peaks
 from math import sqrt, log10
@@ -636,15 +636,15 @@ class DstRF:
                         # update Xi
                         x = gamma[i] * np.matmul(ytilde.T, lhat[:, i]).T
                         # update Zi
-                        # z = inner1d(lhat[:, i], lhat[:, i])
+                        z = inner1d(lhat[:, i], lhat[:, i])
                         # z = np.einsum('i,i->',lhat[:, i], lhat[:, i])
-                        z = (lhat[:, i] ** 2).sum()
+                        # z = (lhat[:, i] ** 2).sum()
 
                     # update Ti
                     if dc == 1:
-                        # gamma[i] = sqrt(inner1d(x, x)) / np.real(sqrt(z))
+                        gamma[i] = sqrt(inner1d(x, x)) / np.real(sqrt(z))
                         # gamma[i] = sqrt(np.einsum('i,i->',x, x)) / np.real(sqrt(z))
-                        gamma[i] = sqrt((x ** 2).sum()) / np.real(sqrt(z))
+                        # gamma[i] = sqrt((x ** 2).sum()) / np.real(sqrt(z))
                     elif dc == 3:
                             _compute_gamma_ip(z, x, gamma[i])
                     else:
@@ -841,9 +841,9 @@ class DstRF:
 
         def f(L, x, bbt, bE, EtE):
             Lx = np.matmul(L, x)
-            # y = bbt - 2 * np.sum(inner1d(bE, Lx)) + np.sum(inner1d(Lx, np.matmul(Lx, EtE)))
-            y = bbt - 2 *  np.einsum('ii', np.einsum('ij,kj->ik', Lx, bE))\
-                + np.einsum('ii', np.einsum('ij,kj->ik', np.matmul(Lx, EtE), Lx))
+            y = bbt - 2 * np.sum(inner1d(bE, Lx)) + np.sum(inner1d(Lx, np.matmul(Lx, EtE)))
+            # y = bbt - 2 *  np.einsum('ii', np.einsum('ij,kj->ik', Lx, bE))\
+            #     + np.einsum('ii', np.einsum('ij,kj->ik', np.matmul(Lx, EtE), Lx))
             return 0.5 * y
 
         def gradf(L, x, bE, EtE):
