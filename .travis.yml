@@ -37,5 +37,5 @@ install:
   - python setup.py develop
 
 script:
-  - pytest
+  - travis_wait pytest
 
