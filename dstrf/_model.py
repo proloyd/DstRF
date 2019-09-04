@@ -637,12 +637,14 @@ class DstRF:
                         x = gamma[i] * np.matmul(ytilde.T, lhat[:, i]).T
                         # update Zi
                         # z = inner1d(lhat[:, i], lhat[:, i])
-                        z = np.einsum('i,i->',lhat[:, i], lhat[:, i])
+                        # z = np.einsum('i,i->',lhat[:, i], lhat[:, i])
+                        z = (lhat[:, i] ** 2).sum()
 
                     # update Ti
                     if dc == 1:
                         # gamma[i] = sqrt(inner1d(x, x)) / np.real(sqrt(z))
-                        gamma[i] = sqrt(np.einsum('i,i->',x, x)) / np.real(sqrt(z))
+                        # gamma[i] = sqrt(np.einsum('i,i->',x, x)) / np.real(sqrt(z))
+                        gamma[i] = sqrt((x ** 2).sum()) / np.real(sqrt(z))
                     elif dc == 3:
                             _compute_gamma_ip(z, x, gamma[i])
                     else:
