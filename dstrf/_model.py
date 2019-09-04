@@ -5,7 +5,7 @@ from operator import attrgetter
 import numpy as np
 
 # Some specialized functions
-from numpy.core.umath_tests import inner1d
+# from numpy.core.umath_tests import inner1d
 from scipy import linalg
 from scipy.signal import find_peaks
 from math import sqrt, log10
@@ -515,9 +515,22 @@ class DstRF:
         self.lead_field /= self.lead_field_scaling
 
         # pre compute some necessary initializations
-        self.eta = (self.lead_field.shape[0] / np.sum(self.lead_field ** 2)) * 1e-2
-        # model data covariance
-        sigma_b = self.noise_covariance + self.eta * np.matmul(self.lead_field, self.lead_field.T)
+        # self.eta = (self.lead_field.shape[0] / np.sum(self.lead_field ** 2)) * 1e-2
+        # # model data covariance
+        # sigma_b = self.noise_covariance + self.eta * np.matmul(self.lead_field, self.lead_field.T)
+        # self.init_sigma_b = sigma_b
+
+    def _init_from_mne(self, data):
+        eta = []
+        sigma_b = []
+        dc = len(self.space) if self.space else 1
+        for y, _ in data:
+            t = y.shape[1]
+            Gamma, data_cov = mne_initialization(y * (t ** 0.5), self.lead_field)
+            Gamma = np.reshape(Gamma, (-1, dc))
+            eta.append([np.diag(g) for g in Gamma])
+            sigma_b.append(self.noise_covariance + data_cov)
+        self.eta = eta
         self.init_sigma_b = sigma_b
 
     def _init_iter(self, data):
@@ -528,9 +541,12 @@ class DstRF:
 
         self.Gamma = []
         self.Sigma_b = []
-        for _ in range(len(data)):
-            self.Gamma.append([self.eta * np.eye(dc, dtype=np.float64) for _ in range(len(self.source))])
-            self.Sigma_b.append(self.init_sigma_b.copy())
+        # for _ in range(len(data)):
+        #     self.Gamma.append([self.eta * np.eye(dc, dtype=np.float64) for _ in range(len(self.source))])
+        #     self.Sigma_b.append(self.init_sigma_b.copy())
+        for g, s in zip(self.eta, self.init_sigma_b):
+            self.Gamma.append(copy.deepcopy(g))
+            self.Sigma_b.append(s.copy())
 
         # initializing \Theta
         self.theta = np.zeros((len(self.source) * dc, data._n_predictor_variables * data.basis.shape[1]),
@@ -618,11 +634,13 @@ class DstRF:
                         # update Xi
                         x = gamma[i] * np.matmul(ytilde.T, lhat[:, i]).T
                         # update Zi
-                        z = inner1d(lhat[:, i], lhat[:, i])
+                        # z = inner1d(lhat[:, i], lhat[:, i])
+                        z = np.einsum('i,i->',lhat[:, i], lhat[:, i])
 
                     # update Ti
                     if dc == 1:
-                        gamma[i] = sqrt(inner1d(x, x)) / np.real(sqrt(z))
+                        # gamma[i] = sqrt(inner1d(x, x)) / np.real(sqrt(z))
+                        gamma[i] = sqrt(np.einsum('i,i->',x, x)) / np.real(sqrt(z))
                     elif dc == 3:
                             _compute_gamma_ip(z, x, gamma[i])
                     else:
@@ -685,6 +703,10 @@ class DstRF:
         # pre-whiten data
         if isinstance(data, REG_Data):
             data._prewhiten(self._whitening_filter)
+
+        logger.info('Initiating from mne sol, please wait...')
+        self._init_from_mne(data)
+        logger.info('Thanks for waiting...')
 
         # take care of cross-validation
         if do_crossvalidation:
@@ -815,7 +837,9 @@ class DstRF:
 
         def f(L, x, bbt, bE, EtE):
             Lx = np.matmul(L, x)
-            y = bbt - 2 * np.sum(inner1d(bE, Lx)) + np.sum(inner1d(Lx, np.matmul(Lx, EtE)))
+            # y = bbt - 2 * np.sum(inner1d(bE, Lx)) + np.sum(inner1d(Lx, np.matmul(Lx, EtE)))
+            y = bbt - 2 *  np.einsum('ii', np.einsum('ij,kj->ik', Lx, bE))\
+                + np.einsum('ii', np.einsum('ij,kj->ik', np.matmul(Lx, EtE), Lx))
             return 0.5 * y
 
         def gradf(L, x, bE, EtE):
@@ -1131,3 +1155,96 @@ class DstRF:
         else:
             raise ValueError(f'criterion={criterion}')
         return best_cv.mu
+
+
+# Functions used for initialize \Gamma
+def find_mu(s, y, eta=1, tol=1e-8, max_iter=1000):
+    """
+
+    :param s: singular values
+    :param y: data whitened by left eigen matrix of svd of L
+            y |-> u.T @ y
+    :param eta: SNR
+        if prewhitened use 1.
+    :param tol:
+    :param max_iter:
+    :return: mu, float
+    """
+    logger = logging.getLogger(__name__)
+    e = s ** 2
+    z = y ** 2
+    TM = z.size
+    eta = eta * TM
+    z2 = z.sum(axis=1)
+    mu = 0
+    diff = []
+
+    logger.info('please wait: calculating mu...')
+    for _ in range(max_iter):
+        temp = 1 + mu * e
+        fmu = z2 / (temp ** 2)
+        f = fmu.sum() - eta
+        dfmu = (-2) * fmu * e / temp
+        diff.append(f / dfmu.sum())
+        if (mu == 0 and f < 0) or abs(diff[-1] / diff[0]) < tol:
+            logger.info(f"thanks for waiting, (mu: {mu}) calculation complete after:"
+                        f"iteration # {len(diff)} with relative error {diff[-1] / diff[0]}")
+            return mu
+        mu -= diff[-1]
+
+    logger.info(f"maximum iteration {max_iter} reached, consider more iterations for convergence!")
+    return mu
+
+
+def wls(y, l, w, return_ecov=False):
+    w = np.squeeze(w)
+    if w.ndim == 1:
+        lw = l * w[None, :]
+    else:
+        lw = l @ w
+    u, s, vh = linalg.svd(lw, full_matrices=False)
+    yw = u.T @ y
+    mu = find_mu(s, yw, eta=1)
+    if mu:
+        gamma = s / (s ** 2 + 1 / mu)
+    else:
+        gamma = 1 / s
+
+    if w.ndim == 1:
+        im = w[:, None] * vh.T
+    else:
+        im = w @ vh.T
+
+    im = im * gamma[None, :]
+
+    if return_ecov is True:
+        ecov = np.eye(w.shape[0]) - vh.T @ ((gamma * s)[:, None] * vh)
+        ecov *= mu
+        if w.ndim == 1:
+            ecov *= w[:, None]
+            ecov *= w[None, :]
+        else:
+            ecov = ecov @ w.T
+            ecov = w @ ecov
+        return im @ yw, mu, ecov
+
+    return im @ yw, mu
+
+
+def mne_initialization(y, l, use_depth_prior=True, exp=0.8):
+    N, M = l.shape
+    T = y.shape[1]
+
+    if use_depth_prior:
+        dw = 1.0 / (l ** 2).sum(axis=0)
+        limit = dw.min() * 10.0
+        depth_weighting = (np.minimum(dw / limit, 1)) ** exp
+    else:
+        depth_weighting = np.ones(M)
+
+    w = np.ones(M)
+    w *= depth_weighting
+    inv, mu, ecov = wls(y, l, w, return_ecov=True)
+    Gamma = np.diag((inv @ inv.T) / T + ecov)
+    data_cov = l * Gamma[None, :] @ l.T
+    return Gamma, data_cov
